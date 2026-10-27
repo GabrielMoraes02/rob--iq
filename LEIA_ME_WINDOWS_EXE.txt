@@ -1,0 +1,83 @@
+BOT MARCOS - WINDOWS 1.0.3
+
+1. Extraia o ZIP inteiro para uma pasta do seu computador.
+2. Abra BotMarcos.exe com dois cliques.
+3. Entre com sua conta da IQ Option.
+
+PRIMEIRA UTILIZACAO
+Na pagina Conexao, preencha o e-mail e a senha da IQ Option e escolha o modo.
+'So observar' acompanha os precos sem enviar ordens. 'DEMO automatica' envia
+ordens com saldo virtual, depois da confirmacao exibida pelo programa.
+Confira recuo em pips, valor por entrada e expiracao e clique Salvar parametros.
+Clique Escolher pares, marque os pares desejados e use Aplicar e salvar pares.
+Voce pode escolher os cinco pares OTC e as versoes sem OTC disponiveis na lista.
+O robo consulta e opera somente os selecionados, quando a corretora confirma
+que estao abertos. Selecione pelo menos um. Para trocar, encerre a sessao primeiro.
+Clique Iniciar sessao e aguarde a confirmacao da conta DEMO e a consulta do saldo.
+A senha nao e salva. Ao reabrir o programa, entre novamente na conta.
+
+Nao precisa instalar Python, Tkinter ou executar arquivos CMD.
+O programa ja inclui as dependencias. A primeira abertura pode levar alguns
+segundos. E necessario acesso a internet para a corretora e o historico.
+Confira 'Windows 1.0.3' no titulo da janela. Feche a versao anterior antes
+de abrir esta; nao execute dois robos na mesma conta ao mesmo tempo.
+
+Quando uma ordem DEMO for aceita, o topo do painel destaca o par, CALL/PUT,
+horario, valor, expiracao e ID. Abra o mesmo par OTC na IQ Option para
+acompanhar. Se houver varias ordens, a lista mostra os pares aguardando
+resultado. Ao concluir, o destaque informa WIN, LOSS ou EMPATE; nao confunda
+uma entrada concluida com uma nova ordem. Sinais e ordens recusadas nao
+acionam o destaque de entrada.
+
+ENTRADA NA MESMA VELA DA SETA
+Depois de uma bolinha fechada, o robo observa a seta em tempo real na vela
+seguinte e aguarda o recuo configurado NESSA MESMA VELA da seta, ate o segundo 29.
+Se nao cumprir as condicoes a tempo, descarta; nao transfere para outra vela.
+A seta em uma vela aberta pode desaparecer antes do fechamento. A deteccao
+fica registrada; um sinal contrario cancela a oportunidade. Os registros de
+entrada incluem seta_t e entrada_t iguais para conferir a vela utilizada.
+O robo calcula as condicoes do indicador pelas velas recebidas da API;
+nao le os desenhos na tela. Diferencas de atualizacao podem afetar o instante.
+
+COMO ACOMPANHAR A ENTRADA NA IQ OPTION
+Entre na mesma conta e selecione saldo de pratica/DEMO. Abra o par EXATO
+mostrado no destaque, inclusive o sufixo OTC, e use velas de 1 minuto (M1).
+CALL/ALTA e compra; PUT/BAIXA e venda. Compare horario, valor e ID com os
+detalhes da operacao na plataforma. O destaque so aparece depois que a
+ordem foi aceita; uma seta ou sinal sozinho ainda nao e uma entrada.
+WIN significa ganho, LOSS significa perda e EMPATE significa lucro zero.
+O preco exato executado e o vencimento devem ser conferidos na corretora.
+
+COMO CONSULTAR O HISTORICO
+Na Visao geral, clique Historico de transacoes ou em um dos cartoes do dia.
+Use os filtros e as datas para consultar outros periodos. A pagina Atividade
+mostra sinais, descartes, recusas e detalhes da sessao. Apenas operacoes
+geradas pelo robo nesta versao entram no historico da nuvem; nao ha importacao
+automatica de operacoes antigas ou realizadas manualmente na corretora.
+
+COMO ENCERRAR
+Clique Encerrar sessao ou Parar bot. Ordens ja abertas continuam na corretora;
+confira o resultado delas na IQ Option. Minimizar a janela nao encerra o robo.
+Para voltar depois de fechar, abra BotMarcos.exe e faca login novamente.
+
+SE APARECER UMA FALHA
+Confira a internet e o motivo na pagina Atividade. Se a sessao terminou,
+ela nao esta acompanhando os pares. Se esta conectada mas nao entra, pode
+estar aguardando que sinal, confirmacao e recuo cumpram as regras.
+Se o historico ficar sem conexao, a fila local e preservada para nova tentativa.
+Para suporte, envie a versao exibida no titulo e o texto da falha; nao envie senha.
+
+Escolha 'So observar' para acompanhar sem ordens, ou 'DEMO automatica' para
+operacoes com saldo virtual. Este programa permite somente PRACTICE/DEMO.
+
+O historico futuro e salvo no Supabase e separado pela conta da corretora.
+Ao entrar na mesma conta em outro computador, os registros sao recuperados.
+Dados locais e parametros ficam em %LOCALAPPDATA%\BotMarcos.
+Nao envie essa pasta de dados para outros clientes.
+
+Antes de fechar ou trocar de computador, confira a mensagem de historico
+salvo no Supabase. Sem internet, a fila e preservada no computador original
+e sera reenviada quando abrir novamente e entrar na mesma conta.
+
+Este pacote nao contem senha, sessao, historico pessoal nem chave administrativa.
+Versao para Windows 64 bits. O arquivo EXE nao funciona no macOS.

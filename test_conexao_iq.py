@@ -1,0 +1,46 @@
+import json
+import ssl
+import unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
+from conexao_iq import instalar_compatibilidade
+
+
+class Conexao(unittest.TestCase):
+    def api(self, resposta):
+        class Original:
+            def connect(self): return resposta
+            def close(self): self.fechado = True
+            @property
+            def websocket(self): return self.websocket_client.wss
+        stable = SimpleNamespace(IQOptionAPI=Original)
+        instalar_compatibilidade(stable)
+        return stable.IQOptionAPI()
+
+    def test_erro_nao_json_nao_mascara_causa(self):
+        for motivo in ('[Errno 11001] getaddrinfo failed', '[Errno 2] No such file or directory', '', None):
+            with self.subTest(motivo=motivo):
+                ok, texto = self.api((False, motivo)).connect()
+                self.assertFalse(ok)
+                self.assertEqual(json.loads(texto)['code'], 'connection_error')
+
+    def test_preserva_verificacao_e_sucesso(self):
+        motivo = json.dumps({'code': 'verify', 'token': 'token-simulado'})
+        self.assertEqual(self.api((False, motivo)).connect(), (False, motivo))
+        self.assertEqual(self.api((True, None)).connect(), (True, None))
+
+    def test_certificados_absolutos_e_tls_verificado(self):
+        from iqoptionapi import global_value
+        with patch('iqoptionapi.api.WebsocketClient', return_value=SimpleNamespace(wss=Mock())), patch('threading.Thread') as thread:
+            def abrir(): global_value.check_websocket_if_connect = 1
+            thread.return_value.start.side_effect = abrir
+            self.assertEqual(self.api((True,None)).start_websocket(), (True,None))
+            opcoes = thread.call_args.kwargs['kwargs']['sslopt']
+            self.assertEqual(opcoes['cert_reqs'], ssl.CERT_REQUIRED)
+            self.assertTrue(opcoes['check_hostname'])
+            self.assertTrue(Path(opcoes['ca_certs']).is_absolute())
+            self.assertTrue(Path(opcoes['ca_certs']).is_file())
+
+
+if __name__ == '__main__': unittest.main()
