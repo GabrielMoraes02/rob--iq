@@ -1,4 +1,4 @@
-BOT MARCOS - WINDOWS 1.0.10
+BOT MARCOS - WINDOWS 1.0.11
 
 1. Extraia o ZIP inteiro para uma pasta do seu computador.
 2. Abra BotMarcos.exe com dois cliques.
@@ -10,16 +10,16 @@ Na aba Inicio, preencha o e-mail e a senha da IQ Option e escolha o modo.
 ordens com saldo virtual, depois da confirmacao exibida pelo programa.
 Confira recuo em pips, valor por entrada e expiracao e clique Salvar parametros.
 Clique Escolher pares, marque os pares desejados e use Aplicar e salvar pares.
-Voce pode escolher os cinco pares OTC e as versoes sem OTC disponiveis na lista.
+A lista de Binarias/Turbo e carregada da corretora, incluindo os novos ativos.
 O robo consulta e opera somente os selecionados, quando a corretora confirma
-que estao abertos. Selecione pelo menos um. Para trocar, encerre a sessao primeiro.
+que estao abertos. Pode trocar os pares durante a conexao. Sem pares, permanece conectado sem novas entradas.
 Clique Iniciar sessao e aguarde a confirmacao da conta DEMO e a consulta do saldo.
 A senha nao e salva. Ao reabrir o programa, entre novamente na conta.
 
 Nao precisa instalar Python, Tkinter ou executar arquivos CMD.
 O programa ja inclui as dependencias. A primeira abertura pode levar alguns
 segundos. E necessario acesso a internet para a corretora e o historico.
-Confira 'Windows 1.0.10' no titulo da janela. Feche a versao anterior antes
+Confira 'Windows 1.0.11' no titulo da janela. Feche a versao anterior antes
 de abrir esta; nao execute dois robos na mesma conta ao mesmo tempo.
 
 Quando uma ordem DEMO for aceita, o topo do painel destaca o par, CALL/PUT,
@@ -110,7 +110,7 @@ Ao fechar a janela, o painel espera encerrar o motor antes de sair.
 Isso impede novas entradas; ordens ja abertas seguem ate o vencimento
 na corretora e devem ser conferidas diretamente na IQ Option.
 
-DISPONIBILIDADE DOS PARES (1.0.10)
+DISPONIBILIDADE DOS PARES (1.0.11)
 Aberto: a corretora confirmou o ativo em Binarias/Turbo.
 Fechado: a corretora informou que o ativo esta desabilitado ou suspenso.
 Nao confirmada: faltam dados, o codigo nao consta na lista ou a consulta falhou.
@@ -118,7 +118,7 @@ O motivo aparece em Atividade ao vivo. O robo consulta novamente a cada minuto.
 Selecionar um par ou aumentar a expiracao nao garante que ele esteja aberto.
 O mesmo par disponivel em Digital nao confirma disponibilidade em Binarias/Turbo.
 
-CODIGOS DOS PARES (1.0.10)
+CODIGOS DOS PARES (1.0.11)
 O robo procura o nome do par e sua variante -op na resposta da corretora.
 Usa o codigo confirmado para consultar os precos e enviar ordens. O motivo
 na aba Atividade ao vivo mostra o nome recebido e o codigo utilizado.
@@ -153,3 +153,21 @@ habilita novas ordens em Blitz, Digital ou Margem. Quando uma fonte falha,
 a tela informa lista incompleta; depois de encerrar mostra a ultima consulta.
 Nao ha rankings artificiais nem garantia de que a API exponha todos os
 ativos e destaques disponiveis na interface web da IQ Option.
+
+TROCAR PARES SEM PARAR (1.0.11)
+1. Conecte a conta para carregar a lista atualizada.
+2. Clique Escolher pares. A tela mostra as Binarias/Turbo disponiveis.
+3. Use a busca, OTC ou Selecionados; marque/desmarque os ativos.
+4. Clique Aplicar e salvar pares e aguarde a confirmacao do motor.
+Nao precisa parar ou fazer login novamente para trocar os pares.
+
+A lista e consultada em ciclos de cerca de 10 segundos mais a resposta da
+corretora. Se um ativo deixar Binarias e aparecer so em Blitz, novas entradas
+ficam bloqueadas. Outros ativos de Binarias aparecem para voce selecionar.
+Nao ha troca automatica de seus selecionados, nem operacoes em Blitz.
+Para retirar todos, clique Limpar selecao e aplique; a conexao continua.
+Ordens ja abertas seguem na corretora ate o resultado.
+
+O mesmo ativo pode existir em varias modalidades e com diferentes prazos.
+A expiracao e as demais regras do robo continuam sendo respeitadas; o servidor
+pode recusar um prazo nao ofertado. Trinta segundos exige Turbo disponivel.

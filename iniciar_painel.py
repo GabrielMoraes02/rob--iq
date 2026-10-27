@@ -57,7 +57,7 @@ def autoteste(destino):
         # Exercita o botão real contra um motor EXE inerte e seu bootloader.
         import time
         from processos import encerrar_motor, processo_ativo
-        processo = subprocess.Popen(comando_motor()+['--teste-processo'], stdout=subprocess.PIPE,
+        processo = subprocess.Popen(comando_motor()+['--teste-selecao'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, text=True, encoding='utf-8',
             start_new_session=sys.platform != 'win32',
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
@@ -66,6 +66,15 @@ def autoteste(destino):
             filho = json.loads(processo.stdout.readline())['pid']
             assert processo_ativo(filho)
             app.processo = processo
+            import threading
+            threading.Thread(target=app.reader, args=(processo,), daemon=True).start()
+            assert app.aplicar_pares_selecionados(['GBPCHF'])
+            limite = time.monotonic()+10
+            while app.pedido_pares is not None and time.monotonic()<limite:
+                root.update()
+                time.sleep(0.05)
+            assert app.pedido_pares is None
+            assert app.parametros_digitados()['pares'] == ['GBPCHF']
             app.parar_inicio.configure(state='normal')
             app.parar_inicio.invoke()
             limite = time.monotonic()+15
@@ -83,7 +92,7 @@ def autoteste(destino):
             'tls_inicializado': contexto.verify_mode == ssl.CERT_REQUIRED,
             'titulo': root.title(), 'destaque_de_entrada_testado': True,
             'pares_disponiveis': len(app.pares_config), 'selecao_de_pares_testada': True,
-            'expiracao_30s_testada': True, 'opcao_sem_recuo_testada': True, 'catalogo_e_filtros_testados': True,
+            'expiracao_30s_testada': True, 'opcao_sem_recuo_testada': True, 'catalogo_e_filtros_testados': True, 'troca_pares_por_ipc_testada': True,
             'botao_parar_encerrou_motor_e_filho': True,
             'dados_fora_do_executavel': pasta_dados() != pasta_recursos(),
             'painel_sem_login': True, 'nenhuma_ordem_enviada': True}

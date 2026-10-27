@@ -63,8 +63,12 @@ def interpretar_disponibilidade(dados, selecionados):
     """Resolve nomes e IDs da resposta Turbo, nunca adivinha IDs de variantes."""
     if not isinstance(dados, dict):
         raise ValueError('Dados de opcoes binarias/turbo nao recebidos da corretora')
-    bloco = dados.get('turbo')
-    ativos = bloco.get('actives') if isinstance(bloco, dict) else None
+    blocos = [(categoria, dados.get(categoria)) for categoria in ('turbo', 'binary')]
+    ativos = {}
+    for categoria, bloco in blocos:
+        if isinstance(bloco, dict) and isinstance(bloco.get('actives'), dict):
+            for codigo, item in bloco['actives'].items():
+                ativos[(categoria, codigo)] = item
     saida = Disponibilidade()
     for nome in selecionados:
         estado = None
@@ -73,7 +77,7 @@ def interpretar_disponibilidade(dados, selecionados):
         nomes = {nome, nome + '-op'}
         candidatos = []
         if isinstance(ativos, dict):
-            for chave, item in ativos.items():
+            for (categoria, chave), item in ativos.items():
                 if not isinstance(item, dict):
                     continue
                 recebido = nome_instrumento(item.get('name'))
@@ -83,21 +87,23 @@ def interpretar_disponibilidade(dados, selecionados):
                     continue
                 codigo = int(chave)
                 # Chaves equivalentes (ex.: 1 e "1") tornam a resposta ambigua.
-                duplicado = sum(str(k).isdigit() and int(k) == codigo for k in ativos) != 1
+                duplicado = sum(c == categoria and str(k).isascii() and str(k).isdigit() and int(k) == codigo for c, k in ativos) != 1
                 habilitado = flag_disponibilidade(item.get('enabled'))
                 suspenso = flag_disponibilidade(item.get('is_suspended'))
                 aberto = (False if habilitado is False or suspenso is True else
                           True if habilitado is True and suspenso is False else None)
-                candidatos.append({'codigo': codigo, 'nome': recebido or nome,
+                candidatos.append({'codigo': codigo, 'categoria': categoria, 'nome': recebido or nome,
                                    'aberto': None if duplicado else aberto,
                                    'habilitado': habilitado, 'suspenso': suspenso})
             abertos = [c for c in candidatos if c['aberto'] is True]
+            # Mesmo ID nas duas modalidades binarias: prioriza Turbo para os prazos curtos.
+            abertos = list({c['codigo']: c for c in reversed(abertos)}.values())
             if len(abertos) == 1:
                 escolhido = abertos[0]
                 estado = True
                 saida.instrumentos[nome] = escolhido
                 motivo = (f"Binarias/Turbo confirmado: {escolhido['nome']} "
-                          f"(codigo {escolhido['codigo']}).")
+                          f"(codigo {escolhido['codigo']}, {escolhido['categoria']}).")
             elif len(abertos) > 1:
                 motivo = 'Mais de um instrumento aberto corresponde ao par; identificacao ambigua.'
             elif candidatos and all(c['aberto'] is False for c in candidatos):
@@ -109,7 +115,7 @@ def interpretar_disponibilidade(dados, selecionados):
                 motivo = 'Par e variante -op ausentes na lista de Binarias/Turbo desta conta.'
             if candidatos:
                 # Apenas nomes permitidos, IDs numericos e flags; nunca a resposta integral.
-                resumo = ', '.join(f"{c['nome']} id={c['codigo']} habilitado={c['habilitado']} suspenso={c['suspenso']}"
+                resumo = ', '.join(f"{c['nome']} {c['categoria']} id={c['codigo']} habilitado={c['habilitado']} suspenso={c['suspenso']}"
                                    for c in candidatos)
                 motivo += ' Consulta: ' + resumo
         saida[nome] = estado
@@ -140,8 +146,8 @@ def aplicar_instrumento(ativo, consulta, estado):
 def consultar_abertura_binaria(iq):
     """Consulta Turbo por codigo: True aberto, False fechado, None desconhecido.
 
-    As expiracoes suportadas (30 s a 5 min) usam Turbo. Disponibilidade em
-    Digital ou Binary nao autoriza uma ordem Turbo.
+    Resolve somente Binarias/Turbo. Blitz e Digital nunca autorizam ordens.
+    O adaptador usa a categoria confirmada para enviar a ordem.
     """
     import inspect
     metodo = iq.get_all_init_v2
@@ -371,7 +377,16 @@ def processar(ativo, velas, estado, agora, enviar_ordem, iq, disponibilidade_con
     estado['alerta'] = None
 
 
+def receber_pares():
+    return None
+
+
+def pares_pendentes():
+    return False
+
+
 def main():
+    global ATIVOS
     print('\nMARCOS 2027 - V19 GENERAL 3 PIPS | PROTOTIPO PARA VALIDACAO')
     print('Bolinha e seta CALCULADAS pelas velas (NAO sao leitura do indicador visual).')
     print(f'Seta intrabar; recuo de {CORRECAO_PIPS:g} pips na mesma vela da seta; ate 29s.')
@@ -425,15 +440,27 @@ def main():
     cache_disponibilidade_em = 0
     while True:
         try:
+            novos_pares = receber_pares()
+            if novos_pares is not None:
+                ATIVOS = list(novos_pares)
+                estados = {a: estados.get(a, {'ultima_fechada': None, 'alerta': None, 'ultima_operada': None}) for a in ATIVOS}
+                ultima_checagem = {a: 0 for a in ATIVOS}
+                ultima_disponibilidade = {a: 0 for a in ATIVOS}
+                status_disponibilidade = {a: None for a in ATIVOS}
+                cache_disponibilidade = None
+                cache_disponibilidade_em = 0
+                escrever('GERAL', 'PARES_ATUALIZADOS', ','.join(ATIVOS) or 'Nenhum par selecionado; conectado sem novas entradas.')
             if not iq.check_connect():
                 raise ConnectionError('Conexao IQ encerrada')
             for ativo in ATIVOS:
+                if pares_pendentes():
+                    break
                 agora = time.time()
                 if agora - ultima_checagem[ativo] < 1:
                     continue
                 ultima_checagem[ativo] = agora
-                if agora - ultima_disponibilidade[ativo] >= 60 or ultima_disponibilidade[ativo] == 0:
-                    if cache_disponibilidade is None or agora - cache_disponibilidade_em >= 60:
+                if agora - ultima_disponibilidade[ativo] >= 10 or ultima_disponibilidade[ativo] == 0:
+                    if cache_disponibilidade is None or agora - cache_disponibilidade_em >= 10:
                         try:
                             cache_disponibilidade = consultar_abertura_binaria(iq)
                         except Exception as erro_disp:

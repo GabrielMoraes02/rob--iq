@@ -13,7 +13,7 @@ import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk, messagebox
-from configuracao import PADRAO, PARES_DISPONIVEIS, OPCOES_EXPIRACAO, formatar_expiracao, carregar_configuracao, salvar_configuracao, validar_configuracao
+from configuracao import PADRAO, PARES_DISPONIVEIS, OPCOES_EXPIRACAO, formatar_expiracao, carregar_configuracao, salvar_configuracao, validar_configuracao, validar_pares
 from historico_nuvem import Historico, Sincronizador
 from caminhos import pasta_dados, comando_motor, VERSAO
 from processos import encerrar_motor
@@ -98,6 +98,11 @@ class Painel:
         self.liquido = 0.0
         self.ids_resultados = set()
         self.registros = {}
+        self.binarias_dados = []
+        self.binarias_consultado_em = 0
+        self.binarias_erro = ''
+        self.seletor_binarias = None
+        self.pedido_pares = None
         self.catalogo_dados = []
         self.catalogo_falhas = []
         self.catalogo_consultado_em = None
@@ -114,7 +119,7 @@ class Painel:
         self.config_pips = tk.StringVar(value=str(configuracao['pips']).replace('.', ','))
         self.config_valor = tk.StringVar(value=str(configuracao['valor']).replace('.', ','))
         self.config_expiracao = tk.StringVar(value=formatar_expiracao(configuracao['expiracao']))
-        self.pares_config = {par: tk.BooleanVar(value=par in configuracao['pares']) for par in PARES_DISPONIVEIS}
+        self.pares_config = {par: tk.BooleanVar(value=par in configuracao['pares']) for par in dict.fromkeys(PARES_DISPONIVEIS + configuracao['pares'])}
         self.pares_texto = tk.StringVar(value=f"Escolher pares · {len(configuracao['pares'])} selecionados")
         self.config_status = tk.StringVar(value=self.erro_configuracao or 'Parâmetros aplicados ao iniciar a próxima sessão.')
         self.som_ativo = tk.BooleanVar(value=True)
@@ -255,7 +260,7 @@ class Painel:
         for col, title, width in [('ativo', 'Ativo', 145), ('mercado', 'Disponibilidade', 150), ('etapa', 'Etapa atual', 600)]:
             self.ativos.heading(col, text=title)
             self.ativos.column(col, width=width, minwidth=85, stretch=col == 'etapa')
-        for ativo in PARES_DISPONIVEIS:
+        for ativo in self.pares_config:
             self.ativos.insert('', 'end', iid=ativo, values=(ativo, 'Aguardando', 'Inicie a sessão para acompanhar'))
         self.ativos.pack(side='left', fill='x', expand=True)
         mercados_scroll = ttk.Scrollbar(mercados_area, command=self.ativos.yview)
@@ -388,46 +393,44 @@ class Painel:
         self.catalogo_janela = CatalogoPainel(self, BASE)
 
     def abrir_pares(self):
-        if self.processo and self.processo.poll() is None:
-            messagebox.showinfo('Sessão em andamento', 'Encerre a sessão antes de trocar os pares.')
+        from seletor_binarias import SeletorBinarias
+        if self.seletor_binarias is not None and self.seletor_binarias.winfo_exists():
+            self.seletor_binarias.lift()
             return
-        janela = tk.Frame(self.root, bg='#101217')
-        janela.place(x=0, y=0, relwidth=1, relheight=1)
-        janela.lift()
-        caixa = ttk.Frame(janela, padding=28)
-        caixa.place(relx=0.5, rely=0.5, anchor='center', width=640)
-        cabecalho = ttk.Frame(caixa)
-        cabecalho.pack(fill='x')
-        ttk.Label(cabecalho, text='Pares da sessão', font=('Segoe UI', 20)).pack(side='left')
-        escolhas = {par: tk.BooleanVar(value=var.get()) for par, var in self.pares_config.items()}
-        def fechar():
-            janela.grab_release()
-            janela.destroy()
-        ttk.Button(cabecalho, text='×', width=3, command=fechar).pack(side='right')
-        ttk.Label(caixa, text='Selecione os pares que o bot poderá acompanhar e operar.\nCada um ainda precisa estar confirmado aberto na corretora.', style='Sub.TLabel').pack(anchor='w', pady=(10, 16))
-        opcoes = ttk.Frame(caixa)
-        opcoes.pack(fill='x')
-        for i, (par, variavel) in enumerate(escolhas.items()):
-            ttk.Checkbutton(opcoes, text=par, variable=variavel).grid(row=i%5, column=i//5, sticky='w', padx=(0, 80), pady=4)
-        erro = tk.StringVar()
-        ttk.Label(caixa, textvariable=erro, foreground='#ef7c86').pack(anchor='w', pady=(10, 4))
-        def aplicar():
-            if not any(v.get() for v in escolhas.values()):
-                erro.set('Selecione pelo menos um par.')
-                return
-            anterior = {par: var.get() for par, var in self.pares_config.items()}
-            for par, var in escolhas.items():
-                self.pares_config[par].set(var.get())
-            if self.salvar_parametros():
-                fechar()
+        self.seletor_binarias = SeletorBinarias(self)
+
+    def definir_pares(self, pares):
+        for par in pares:
+            if par not in self.pares_config:
+                self.pares_config[par] = tk.BooleanVar(value=False)
+            if not self.ativos.exists(par):
+                self.ativos.insert('', 'end', iid=par, values=(par, 'Aguardando', 'Aguardando confirmação da corretora'))
+        for par, variavel in self.pares_config.items():
+            variavel.set(par in pares)
+        self.atualizar_pares_selecionados()
+
+    def aplicar_pares_selecionados(self, pares):
+        try:
+            pares = validar_pares(pares)
+            if self.processo and self.processo.poll() is None:
+                if self.pedido_pares is not None:
+                    return False
+                import uuid
+                pedido = uuid.uuid4().hex
+                self.processo.stdin.write(json.dumps({'tipo': 'selecionar_pares', 'pedido': pedido, 'pares': pares}) + '\n')
+                self.processo.stdin.flush()
+                self.pedido_pares = pedido
+                self.config_status.set('Aplicando novos pares no motor…')
             else:
-                for par, valor in anterior.items():
-                    self.pares_config[par].set(valor)
-                erro.set(self.config_status.get())
-        ttk.Button(caixa, text='Aplicar e salvar pares', command=aplicar, style='Start.TButton').pack(fill='x', pady=(10, 0))
-        janela.bind('<Escape>', lambda event: fechar())
-        janela.grab_set()
-        janela.focus_set()
+                parametros = self.parametros_digitados()
+                parametros['pares'] = pares
+                salvar_configuracao(BASE, parametros)
+                self.definir_pares(pares)
+                self.config_status.set('Pares salvos para a próxima sessão.')
+            return True
+        except (OSError, ValueError) as erro:
+            self.config_status.set('Não foi possível aplicar os pares: ' + str(erro))
+            return False
 
     def salvar_parametros(self):
         if self.processo and self.processo.poll() is None:
@@ -454,7 +457,7 @@ class Painel:
         if not bloqueado and self.config_sem_recuo.get():
             self.campos_config[0].configure(state='disabled')
         self.salvar_config.configure(state='disabled' if bloqueado else 'normal')
-        self.escolher_pares.configure(state='disabled' if bloqueado else 'normal')
+        self.escolher_pares.configure(state='normal')
 
     def start(self):
         if not self.email.get().strip() or not self.senha.get():
@@ -497,13 +500,16 @@ class Painel:
         self.ultimo_saldo_recebido = None
         self.saldo_texto.set('Saldo demo: consultando…')
         self.saldo_valor.set('—')
+        self.binarias_dados = []
+        self.binarias_consultado_em = 0
+        self.binarias_erro = ''
+        self.pedido_pares = None
         self.modo_sessao = modo
         self.ordens = 0
         try:
             self.processo = subprocess.Popen(comando_motor(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace', cwd=BASE, start_new_session=sys.platform != 'win32', creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if sys.platform == 'win32' else 0, env={**__import__('os').environ, 'PYTHONIOENCODING': 'utf-8', 'PYINSTALLER_RESET_ENVIRONMENT': '1'})
             self.processo.stdin.write(json.dumps({'email': self.email.get().strip(), 'senha': self.senha.get(), 'modo': self.modo_sessao, 'configuracao': parametros}) + '\n')
             self.processo.stdin.flush()
-            self.processo.stdin.close()
             self.senha.delete(0, 'end')
             self.iniciar.configure(state='disabled')
             self.bloquear_parametros(True)
@@ -846,7 +852,31 @@ class Painel:
 
     def atualizar_financeiro(self, dados):
         tipo = dados.get('tipo')
-        if tipo == 'catalogo':
+        if tipo == 'binarias_ao_vivo':
+            self.binarias_dados = dados.get('ativos', [])
+            self.binarias_consultado_em = dados.get('consultado_em', 0)
+            self.binarias_erro = dados.get('erro', '')
+            if self.seletor_binarias is not None:
+                self.seletor_binarias.atualizar()
+        elif tipo in ('pares_aplicados', 'pares_recusados'):
+            if dados.get('pedido') != self.pedido_pares:
+                return
+            self.pedido_pares = None
+            if tipo == 'pares_aplicados':
+                self.definir_pares(validar_pares(dados['pares']))
+                try:
+                    salvar_configuracao(BASE, self.parametros_digitados())
+                    self.config_status.set('Pares atualizados na sessão e salvos.')
+                except (OSError, ValueError):
+                    self.config_status.set('Pares aplicados no motor; não foi possível salvar neste computador.')
+                if self.seletor_binarias is not None:
+                    self.seletor_binarias.fechar()
+            else:
+                self.config_status.set(dados.get('motivo', 'Seleção recusada pelo motor.'))
+                if self.seletor_binarias is not None:
+                    self.seletor_binarias.atualizar()
+                    self.seletor_binarias.status.set(self.config_status.get())
+        elif tipo == 'catalogo':
             self.catalogo_dados = dados.get('ativos', [])
             self.catalogo_falhas = dados.get('falhas', [])
             self.catalogo_consultado_em = dados.get('consultado_em')
@@ -939,7 +969,16 @@ class Painel:
     def finalizar_sessao(self):
         estava_parando = self.parando
         self.parando = False
+        if self.processo is not None and self.processo.stdin is not None:
+            try:
+                self.processo.stdin.close()
+            except OSError:
+                pass
         self.processo = None
+        self.pedido_pares = None
+        self.binarias_consultado_em = 0
+        if self.seletor_binarias is not None:
+            self.seletor_binarias.atualizar()
         if self.catalogo_janela is not None:
             self.catalogo_janela.atualizar()
         self.bloquear_parametros(False)

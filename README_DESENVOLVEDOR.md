@@ -1,4 +1,4 @@
-# Código-fonte do Bot Marcos — Windows 1.0.10
+# Código-fonte do Bot Marcos — Windows 1.0.11
 
 Esta pasta é o projeto original editável. O executável é gerado a partir
 destes arquivos; alterar o código não modifica um EXE que já foi gerado.
@@ -60,7 +60,7 @@ Uma versão Windows deve ser gerada no Windows; este build não gera `.app`.
 ## O que o comando entrega
 
 - `dist-windows\BotMarcos.exe`: aplicativo final para o cliente, com o motor e o Python incluídos.
-- `dist-windows\BOT_MARCOS_WINDOWS_1.0.10.zip`: pacote com o EXE e `LEIA-ME.txt`.
+- `dist-windows\BOT_MARCOS_WINDOWS_1.0.11.zip`: pacote com o EXE e `LEIA-ME.txt`.
 - `dist-motor\MotorMarcos.exe`: componente interno; não é o arquivo para o cliente abrir.
 - `build-*`: arquivos intermediários; não precisam ser enviados ao cliente.
 
@@ -232,3 +232,28 @@ consulta marcada como antiga; uma nova sessao limpa o catalogo anterior.
 A lista depende do retorno da conta/regiao e pode diferir dos destaques e
 rankings da interface web. Nao inventa percentuais, tendencias ou mercados
 que a API nao retornou. Nao habilita negociacao em Blitz/Digital/Margem.
+
+## Selecao de Binarias durante a conexao (1.0.11)
+
+`pares_ao_vivo.py` consulta a lista de Binarias/Turbo a cada 10 segundos
+mais tempo de resposta. Blitz/Digital nao entram no seletor. A lista perde
+a validade apos 20 segundos sem consulta confirmada. Dados v4 alimentam
+a disponibilidade do motor e a checagem imediatamente anterior a ordem.
+
+O stdin do motor permanece aberto depois do envio inicial das credenciais.
+Comandos selecionar_pares possuem ID; a interface so aplica e persiste
+a selecao depois da confirmacao pares_aplicados. Pedidos com novos ativos
+nao confirmados abertos sao recusados. Remover todos deixa a conta conectada
+sem novas entradas. Retirar um par bloqueia novas ordens desde o recebimento
+do pedido; ordens pendentes continuam sendo acompanhadas.
+
+A fila e consumida pelo loop do motor antes da leitura dos pares. Novos
+ativos comecam sem sinais anteriores. Retidos mantem estado; removidos saem
+da analise. A categoria binary/turbo e preservada no envio; raw binary usa
+o vencimento calculado pela SDK para a expiracao pedida. Trinta segundos
+continuam restritos a Turbo. A corretora pode recusar prazo nao oferecido.
+
+O seletor aceita nomes novos da resposta da corretora. A configuracao valida
+a sintaxe e tamanho; a disponibilidade e identidade sao verificadas na
+sessao. Busca, OTC, so disponiveis, selecionados e marcar visiveis nao
+alteram valor, recuo, modo de operacao nem expiracao.

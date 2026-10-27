@@ -6,6 +6,22 @@ from caminhos import pasta_recursos, pasta_dados
 from catalogo import acompanhar_catalogo
 import expiracao_ordem  # Inclui o adaptador no motor empacotado.
 
+if '--teste-selecao' in sys.argv:
+    # Testa IPC/seleção no pacote, sem login, rede ou ordens.
+    import os
+    from pares_ao_vivo import ParesAoVivo
+    def emitir_teste(dados):
+        print('__PAINEL__' + json.dumps(dados), flush=True)
+    selecao_teste = ParesAoVivo([], emitir_teste)
+    selecao_teste.atualizar_catalogo({'binary': {'actives': {'999': {
+        'name': 'front.GBPCHF-op', 'enabled': True, 'is_suspended': False}}},
+        'turbo': {'actives': {}}, 'blitz': {'actives': {}}})
+    print(json.dumps({'teste_processo': True, 'pid': os.getpid()}), flush=True)
+    for linha_teste in sys.stdin:
+        selecao_teste.receber(json.loads(linha_teste))
+        selecao_teste.consumir()
+    sys.exit(0)
+
 if '--teste-processo' in sys.argv:
     # Processo inerte para testar a parada do EXE sem autenticação ou ordens.
     import os
@@ -82,6 +98,27 @@ def publicar(dados):
     with saida_lock:
         print('__PAINEL__' + json.dumps(dados), flush=True)
 
+from pares_ao_vivo import ParesAoVivo, acompanhar_binarias
+selecao_viva = ParesAoVivo(motor.ATIVOS, publicar)
+motor.receber_pares = selecao_viva.consumir
+motor.pares_pendentes = lambda: selecao_viva.pendente is not None
+
+def consultar_binarias_vivas(iq):
+    with selecao_viva.lock:
+        dados, consultado = selecao_viva.dados, selecao_viva.consultado_em
+    if dados is None or __import__('time').time() - consultado > 20:
+        raise ValueError('Aguardando consulta atualizada de Binarias.')
+    return motor.interpretar_disponibilidade(dados, motor.ATIVOS)
+motor.consultar_abertura_binaria = consultar_binarias_vivas
+
+def receber_comandos():
+    for linha in sys.stdin:
+        try:
+            selecao_viva.receber(json.loads(linha))
+        except (ValueError, TypeError):
+            continue
+threading.Thread(target=receber_comandos, daemon=True).start()
+
 saldo_stop = None
 saldo_agora = None
 
@@ -100,7 +137,28 @@ def acompanhar_saldo(iq, parar, atualizar):
 
 ClasseOriginal = stable_api.IQ_Option
 class ContaPainel(ClasseOriginal):
+    def verificar_par_para_ordem(self, ativo):
+        if not selecao_viva.permite(ativo):
+            raise RuntimeError('Par removido da selecao; nenhuma nova ordem permitida.')
+        with selecao_viva.lock:
+            dados, consultado = selecao_viva.dados, selecao_viva.consultado_em
+        if dados is None or __import__('time').time() - consultado > 20:
+            raise RuntimeError('Disponibilidade desatualizada; aguardando consulta de Binarias.')
+        consulta = motor.interpretar_disponibilidade(dados, [ativo])
+        from iqoptionapi.constants import ACTIVES
+        instrumento = consulta.instrumentos.get(ativo)
+        if consulta.get(ativo) is not True or instrumento is None or instrumento['codigo'] != ACTIVES.get(ativo):
+            raise RuntimeError('Par nao confirmado em Binarias/Turbo com o mesmo codigo; ordem bloqueada.')
+        return instrumento['categoria']
+
+    def buy(self, price, active, direction, duration):
+        categoria = self.verificar_par_para_ordem(active)
+        return expiracao_ordem.comprar_binaria_categoria(self, price, active, direction, duration, categoria, super().buy)
+
     def buy_by_raw_expirations(self, price, active, direction, option, expired):
+        categoria = self.verificar_par_para_ordem(active)
+        if categoria != option:
+            raise RuntimeError('Expiracao de 30 segundos nao confirmada em Turbo para este par.')
         return expiracao_ordem.comprar_por_vencimento_api(self, price, active, direction, option, expired)
 
     def change_balance(self, tipo):
@@ -123,6 +181,9 @@ class ContaPainel(ClasseOriginal):
                 publicar({'tipo': 'historico_erro'})
             saldo_stop = threading.Event()
             saldo_agora = threading.Event()
+            selecao_viva.atualizar_catalogo(None, 0)
+            threading.Thread(target=acompanhar_binarias,
+                             args=(self, saldo_stop, selecao_viva), daemon=True).start()
             threading.Thread(target=acompanhar_catalogo,
                              args=(self, saldo_stop, publicar), daemon=True).start()
             threading.Thread(target=acompanhar_saldo,

@@ -4,6 +4,21 @@ import time
 import uuid
 
 
+def comprar_binaria_categoria(iq, valor, ativo, direcao, minutos, categoria, comprar_turbo):
+    if not iq.check_connect() or iq.get_balance_mode() != 'PRACTICE':
+        raise RuntimeError('Conta PRACTICE conectada não confirmada.')
+    if categoria == 'turbo':
+        return comprar_turbo(valor, ativo, direcao, minutos)
+    if categoria != 'binary' or isinstance(minutos, bool) or minutos not in (1, 2, 3, 4, 5):
+        raise ValueError('Modalidade ou expiração binária não suportada.')
+    from iqoptionapi.expiration import get_expiration_time
+    agora = iq.get_server_timestamp()
+    if isinstance(agora, bool) or not isinstance(agora, (int, float)) or not math.isfinite(agora) or abs(time.time()-agora) > 3:
+        raise RuntimeError('Relógio da corretora desatualizado; ordem bloqueada.')
+    vencimento, _ = get_expiration_time(agora, minutos)
+    return comprar_por_vencimento_api(iq, valor, ativo, direcao, categoria, vencimento)
+
+
 def comprar_com_expiracao(iq, valor, ativo, direcao, minutos, registrar=None):
     if not iq.check_connect() or iq.get_balance_mode() != 'PRACTICE':
         raise RuntimeError('Conta PRACTICE conectada não confirmada; ordem bloqueada.')
@@ -31,7 +46,7 @@ def comprar_por_vencimento_api(iq, valor, ativo, direcao, produto, vencimento, t
     from iqoptionapi.constants import ACTIVES
     if not iq.check_connect() or iq.get_balance_mode() != 'PRACTICE':
         raise RuntimeError('Conta PRACTICE conectada não confirmada.')
-    if produto != 'turbo':
+    if produto not in ('turbo', 'binary'):
         raise ValueError('Produto não permitido para esta solicitação.')
     req = uuid.uuid4().hex
     api = iq.api

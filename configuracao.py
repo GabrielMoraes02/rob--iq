@@ -1,6 +1,7 @@
 """Parâmetros de operação; nunca guarda credenciais da corretora."""
 import json
 import os
+import re
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -18,6 +19,14 @@ def formatar_expiracao(valor):
         return str(valor)
     return next((rotulo for rotulo, minutos in OPCOES_EXPIRACAO.items()
                  if numero == Decimal(str(minutos))), str(valor))
+
+
+def validar_pares(pares):
+    if not isinstance(pares, list) or len(pares) > 1000 or any(
+            not isinstance(par, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.&/()# -]{0,95}', par)
+            for par in pares):
+        raise ValueError('Lista de pares inválida.')
+    return list(dict.fromkeys(pares))
 
 
 def validar_configuracao(dados):
@@ -46,9 +55,7 @@ def validar_configuracao(dados):
         raise ValueError('O valor deve ser de 1 a 1.000.000, com até duas casas decimais. A corretora ainda pode recusar pelo limite da conta.')
     if expiracao not in {Decimal(str(v)) for v in OPCOES_EXPIRACAO.values()}:
         raise ValueError('Escolha 30 segundos ou de 1 a 5 minutos (binária/turbo).')
-    pares = dados.get('pares', PARES_OTC)
-    if not isinstance(pares, list) or not pares or any(not isinstance(par, str) or par not in PARES_DISPONIVEIS for par in pares):
-        raise ValueError('Selecione pelo menos um dos pares disponíveis no painel.')
+    pares = validar_pares(dados.get('pares', PARES_OTC))
     return {'sem_recuo': sem_recuo, 'pips': float(pips), 'valor': float(valor), 'expiracao': 0.5 if expiracao == Decimal('0.5') else int(expiracao),
             'pares': list(dict.fromkeys(pares))}
 

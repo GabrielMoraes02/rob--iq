@@ -126,6 +126,33 @@ class Botoes(unittest.TestCase):
         self.app.salvar_config.invoke()
         self.assertEqual(json.loads((Path(self.temp.name)/'configuracao.json').read_text())['expiracao'], 0.5)
 
+    def test_seletor_binarias_ao_vivo_so_aplica_apos_confirmacao(self):
+        from pares_ao_vivo import listar_binarias
+        from test_pares_ao_vivo import resposta
+        processo = Mock(stdin=io.StringIO())
+        processo.poll.return_value = None
+        self.app.processo = processo
+        self.app.binarias_dados = listar_binarias(resposta(['GBPCHF-op', 'Apple-op'], ['EURUSD-op']))
+        self.app.binarias_consultado_em = time.time()
+        self.app.bloquear_parametros(True)
+        self.app.escolher_pares.invoke()
+        modal = self.app.seletor_binarias
+        self.assertEqual(set(modal.tabela.get_children()), {'GBPCHF', 'Apple'})
+        modal.limpar()
+        modal.busca.set('GBP/CHF')
+        modal.marcar_visiveis()
+        modal.aplicar_botao.invoke()
+        comando = json.loads(processo.stdin.getvalue())
+        self.assertEqual(comando['pares'], ['GBPCHF'])
+        self.assertEqual(comando['tipo'], 'selecionar_pares')
+        self.assertNotIn('GBPCHF', self.app.pares_config)
+        self.app.atualizar_financeiro({'tipo': 'pares_aplicados', 'pedido': comando['pedido'], 'pares': ['GBPCHF']})
+        self.assertTrue(self.app.pares_config['GBPCHF'].get())
+        self.assertEqual(self.app.parametros_digitados()['pares'], ['GBPCHF'])
+        self.assertIsNone(self.app.seletor_binarias)
+        self.assertIsNone(self.app.pedido_pares)
+        self.assertEqual(json.loads((Path(self.temp.name)/'configuracao.json').read_text())['pares'], ['GBPCHF'])
+
     def test_conectar_valida_e_executa_com_motor_falso(self):
         with patch.object(painel.messagebox, 'showinfo') as aviso:
             self.app.iniciar.invoke()

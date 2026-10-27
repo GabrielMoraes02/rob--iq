@@ -40,9 +40,9 @@ class Disponibilidade(unittest.TestCase):
         with self.assertRaises(ValueError):
             bot.interpretar_disponibilidade(None, ['EURUSD'])
 
-    def test_digital_e_binary_nao_confirmam_turbo(self):
+    def test_digital_e_blitz_nao_confirmam_binarias(self):
         dados = {categoria: {'actives': {'1': {'name': 'front.EURUSD', 'enabled': True, 'is_suspended': False}}}
-                 for categoria in ('digital', 'binary')}
+                 for categoria in ('digital', 'blitz')}
         self.assertIsNone(bot.interpretar_disponibilidade(dados, ['EURUSD'])['EURUSD'])
 
     def test_dez_pares_identificados_por_codigo(self):

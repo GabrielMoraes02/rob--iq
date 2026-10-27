@@ -47,7 +47,7 @@ class Configuracao(unittest.TestCase):
             config=carregar_configuracao(pasta)
             aplicar_no_motor(motor,config)
             self.assertEqual(motor.ATIVOS,['EURUSD','GBPJPY-OTC'])
-        for pares in ([], 'EURUSD', ['INVALIDO'], [None]):
+        for pares in ('EURUSD', ['INVALIDO|x'], [None]):
             with self.subTest(pares=pares),self.assertRaises(ValueError):validar_configuracao({'pares':pares})
 
     def test_painel_salva_selecao_e_bloqueia_troca_durante_sessao(self):
@@ -65,7 +65,7 @@ class Configuracao(unittest.TestCase):
                 self.assertEqual(set(carregar_configuracao(pasta)['pares']), {'EURUSD', 'GBPJPY-OTC'})
                 self.assertEqual(app.ativos.item('EURUSD-OTC', 'values')[1], 'Não selecionado')
                 app.bloquear_parametros(True)
-                self.assertEqual(str(app.escolher_pares.cget('state')), 'disabled')
+                self.assertEqual(str(app.escolher_pares.cget('state')), 'normal')
                 app.bloquear_parametros(False)
                 self.assertEqual(str(app.escolher_pares.cget('state')), 'normal')
         finally:
