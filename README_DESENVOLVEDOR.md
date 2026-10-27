@@ -1,4 +1,4 @@
-# Código-fonte do Bot Marcos — Windows 1.0.7
+# Código-fonte do Bot Marcos — Windows 1.0.8
 
 Esta pasta é o projeto original editável. O executável é gerado a partir
 destes arquivos; alterar o código não modifica um EXE que já foi gerado.
@@ -60,7 +60,7 @@ Uma versão Windows deve ser gerada no Windows; este build não gera `.app`.
 ## O que o comando entrega
 
 - `dist-windows\BotMarcos.exe`: aplicativo final para o cliente, com o motor e o Python incluídos.
-- `dist-windows\BOT_MARCOS_WINDOWS_1.0.7.zip`: pacote com o EXE e `LEIA-ME.txt`.
+- `dist-windows\BOT_MARCOS_WINDOWS_1.0.8.zip`: pacote com o EXE e `LEIA-ME.txt`.
 - `dist-motor\MotorMarcos.exe`: componente interno; não é o arquivo para o cliente abrir.
 - `build-*`: arquivos intermediários; não precisam ser enviados ao cliente.
 
@@ -173,17 +173,27 @@ ordens. O autoteste do EXE inicia um MotorMarcos inerte com --teste-processo,
 clica no botão de parada e verifica a ausência do processo filho. Esse modo
 inerte não se conecta à corretora e não executa o motor de negociação.
 
-## Disponibilidade dos pares (1.0.7)
+## Disponibilidade e codigos dos pares (1.0.8)
 
-A consulta Turbo cruza as chaves de `actives` com os mesmos codigos de
-`iqoptionapi.constants.ACTIVES` usados por velas e ordens. Nomes alternativos
-na resposta nao mudam o instrumento negociado. Nao troca codigos nem usa
-abertura em Digital/Binary para liberar Turbo.
+O motor resolve os nomes devolvidos pela propria resposta `turbo.actives`,
+aceitando o nome exato selecionado ou sua variante `-op`. OTC nunca e
+substituido pelo par normal. O ID vem da chave do instrumento recebido, sem
+IDs de variantes fixados no codigo. Nomes ausentes ou divergentes bloqueiam.
 
-Flags booleanas e inteiros 0/1 sao reconhecidos. `enabled=false` ou
-`is_suspended=true` confirmam bloqueio. Abertura exige `enabled=true` e
-`is_suspended=false`; campos ausentes/invalidos ficam como nao confirmados.
-Cada evento informa o motivo, sem copiar a resposta da API ou dados de sessao.
-Testes cobrem os dez codigos, dados incompletos, suspensao, IDs divergentes,
-reconsulta e apresentacao na interface. Validacao local nao comprova a
-disponibilidade atual dos mercados na conta da corretora.
+Uma unica correspondencia aberta e necessaria. Se duas variantes estiverem
+abertas, a resposta e ambigua e nenhuma e escolhida automaticamente. Uma
+variante aberta pode substituir a variante legada suspensa do mesmo par.
+Abertura exige enabled=true/1 e is_suspended=false/0. Digital/Binary nao
+liberam Turbo. Respostas incompletas continuam bloqueadas.
+
+Antes das velas, aplica o ID descoberto ao ACTIVES compartilhado pela SDK.
+Get_candles, buy e envio raw de 30 segundos usam assim o mesmo ID.
+Troca de ID descarta os sinais anteriores. Uma consulta fechada/desconhecida
+limpa o alerta, e a reabertura comeca com velas novas. A consulta e refeita
+a cada minuto. Nenhum mapeamento e salvo nas configuracoes do cliente.
+
+O motivo exibido inclui somente nomes de pares permitidos, IDs numericos e
+flags de abertura; nunca a resposta integral, credenciais ou sessoes.
+Testes simulam a resposta e exercitam os metodos reais da SDK com transporte
+falso para conferir os IDs de velas e ordens. A disponibilidade e aceitacao
+atuais dependem da resposta da corretora na sessao do cliente.

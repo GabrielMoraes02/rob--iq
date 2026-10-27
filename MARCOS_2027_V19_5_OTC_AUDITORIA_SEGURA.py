@@ -40,6 +40,7 @@ class Disponibilidade(dict):
     def __init__(self):
         super().__init__()
         self.motivos = {}
+        self.instrumentos = {}
 
 
 def flag_disponibilidade(valor):
@@ -51,40 +52,88 @@ def flag_disponibilidade(valor):
     return None
 
 
-def interpretar_disponibilidade(dados, codigos, selecionados):
+def nome_instrumento(valor):
+    if not isinstance(valor, str):
+        return ''
+    return valor.rsplit('.', 1)[-1]
+
+
+def interpretar_disponibilidade(dados, selecionados):
+    """Resolve nomes e IDs da resposta Turbo, nunca adivinha IDs de variantes."""
     if not isinstance(dados, dict):
         raise ValueError('Dados de opcoes binarias/turbo nao recebidos da corretora')
     bloco = dados.get('turbo')
     ativos = bloco.get('actives') if isinstance(bloco, dict) else None
     saida = Disponibilidade()
     for nome in selecionados:
-        codigo = codigos.get(nome)
-        motivo = 'Resposta de Binarias/Turbo incompleta.'
         estado = None
-        if codigo is None:
-            motivo = 'Codigo do par nao encontrado na biblioteca de ordens.'
-        elif isinstance(ativos, dict):
-            # O codigo e o mesmo utilizado por get_candles/buy. Nomes podem
-            # variar, mas nunca substituimos um instrumento por outro codigo.
-            itens = [valor for chave, valor in ativos.items() if str(chave) == str(codigo)]
-            if len(itens) != 1 or not isinstance(itens[0], dict):
-                motivo = 'Par ausente ou ambiguo na lista de Binarias/Turbo.'
-            else:
-                item = itens[0]
+        motivo = 'Resposta de Binarias/Turbo incompleta.'
+        # -op e uma variante explicita do mesmo par. OTC e normal nunca se misturam.
+        nomes = {nome, nome + '-op'}
+        candidatos = []
+        if isinstance(ativos, dict):
+            for chave, item in ativos.items():
+                if not isinstance(item, dict):
+                    continue
+                recebido = nome_instrumento(item.get('name'))
+                if recebido not in nomes:
+                    continue
+                if isinstance(chave, bool) or not str(chave).isascii() or not str(chave).isdigit() or int(chave) <= 0:
+                    continue
+                codigo = int(chave)
+                # Chaves equivalentes (ex.: 1 e "1") tornam a resposta ambigua.
+                duplicado = sum(str(k).isdigit() and int(k) == codigo for k in ativos) != 1
                 habilitado = flag_disponibilidade(item.get('enabled'))
                 suspenso = flag_disponibilidade(item.get('is_suspended'))
-                if habilitado is False or suspenso is True:
-                    estado = False
-                    motivo = ('Corretora informou par desabilitado em Binarias/Turbo.'
-                              if habilitado is False else 'Corretora informou par suspenso em Binarias/Turbo.')
-                elif habilitado is True and suspenso is False:
-                    estado = True
-                    motivo = 'Abertura confirmada em Binarias/Turbo.'
-                else:
-                    motivo = 'Corretora nao confirmou os campos de abertura em Binarias/Turbo.'
+                aberto = (False if habilitado is False or suspenso is True else
+                          True if habilitado is True and suspenso is False else None)
+                candidatos.append({'codigo': codigo, 'nome': recebido or nome,
+                                   'aberto': None if duplicado else aberto,
+                                   'habilitado': habilitado, 'suspenso': suspenso})
+            abertos = [c for c in candidatos if c['aberto'] is True]
+            if len(abertos) == 1:
+                escolhido = abertos[0]
+                estado = True
+                saida.instrumentos[nome] = escolhido
+                motivo = (f"Binarias/Turbo confirmado: {escolhido['nome']} "
+                          f"(codigo {escolhido['codigo']}).")
+            elif len(abertos) > 1:
+                motivo = 'Mais de um instrumento aberto corresponde ao par; identificacao ambigua.'
+            elif candidatos and all(c['aberto'] is False for c in candidatos):
+                estado = False
+                motivo = 'Corretora informou os instrumentos deste par desabilitados ou suspensos em Binarias/Turbo.'
+            elif candidatos:
+                motivo = 'Corretora nao confirmou os campos de abertura ou a identidade em Binarias/Turbo.'
+            else:
+                motivo = 'Par e variante -op ausentes na lista de Binarias/Turbo desta conta.'
+            if candidatos:
+                # Apenas nomes permitidos, IDs numericos e flags; nunca a resposta integral.
+                resumo = ', '.join(f"{c['nome']} id={c['codigo']} habilitado={c['habilitado']} suspenso={c['suspenso']}"
+                                   for c in candidatos)
+                motivo += ' Consulta: ' + resumo
         saida[nome] = estado
         saida.motivos[nome] = motivo
     return saida
+
+
+def aplicar_instrumento(ativo, consulta, estado):
+    """Velas e ambos os caminhos de ordem usam o mesmo ACTIVES no processo."""
+    from iqoptionapi import constants
+    instrumento = getattr(consulta, 'instrumentos', {}).get(ativo)
+    if consulta.get(ativo) is not True:
+        estado['alerta'] = None
+        estado['ultima_fechada'] = None
+        return
+    if instrumento is None:
+        return
+    codigo = instrumento['codigo']
+    if estado.get('codigo_instrumento') != codigo:
+        # Nunca reaproveita sinal/preco de outro instrumento depois de remapear.
+        estado['alerta'] = None
+        estado['ultima_fechada'] = None
+        estado['ultima_operada'] = None
+        estado['codigo_instrumento'] = codigo
+    constants.ACTIVES[ativo] = codigo
 
 
 def consultar_abertura_binaria(iq):
@@ -94,11 +143,10 @@ def consultar_abertura_binaria(iq):
     Digital ou Binary nao autoriza uma ordem Turbo.
     """
     import inspect
-    from iqoptionapi.constants import ACTIVES
     metodo = iq.get_all_init_v2
     parametros = inspect.signature(metodo).parameters
     dados = metodo(polling=0.1) if 'polling' in parametros else metodo()
-    return interpretar_disponibilidade(dados, ACTIVES, ATIVOS)
+    return interpretar_disponibilidade(dados, ATIVOS)
 
 
 def ativo_aberto(iq, ativo, tempos=None):
@@ -388,6 +436,7 @@ def main():
                             escrever('GERAL', 'ERRO_DISPONIBILIDADE', repr(erro_disp))
                             cache_disponibilidade = {}
                         cache_disponibilidade_em = agora
+                    aplicar_instrumento(ativo, cache_disponibilidade, estados[ativo])
                     status_disponibilidade[ativo] = ativo_aberto(iq, ativo, cache_disponibilidade)
                     ultima_disponibilidade[ativo] = agora
                     valor = status_disponibilidade[ativo]

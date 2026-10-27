@@ -1,4 +1,4 @@
-BOT MARCOS - WINDOWS 1.0.7
+BOT MARCOS - WINDOWS 1.0.8
 
 1. Extraia o ZIP inteiro para uma pasta do seu computador.
 2. Abra BotMarcos.exe com dois cliques.
@@ -19,7 +19,7 @@ A senha nao e salva. Ao reabrir o programa, entre novamente na conta.
 Nao precisa instalar Python, Tkinter ou executar arquivos CMD.
 O programa ja inclui as dependencias. A primeira abertura pode levar alguns
 segundos. E necessario acesso a internet para a corretora e o historico.
-Confira 'Windows 1.0.7' no titulo da janela. Feche a versao anterior antes
+Confira 'Windows 1.0.8' no titulo da janela. Feche a versao anterior antes
 de abrir esta; nao execute dois robos na mesma conta ao mesmo tempo.
 
 Quando uma ordem DEMO for aceita, o topo do painel destaca o par, CALL/PUT,
@@ -110,10 +110,17 @@ Ao fechar a janela, o painel espera encerrar o motor antes de sair.
 Isso impede novas entradas; ordens ja abertas seguem ate o vencimento
 na corretora e devem ser conferidas diretamente na IQ Option.
 
-DISPONIBILIDADE DOS PARES (1.0.7)
+DISPONIBILIDADE DOS PARES (1.0.8)
 Aberto: a corretora confirmou o ativo em Binarias/Turbo.
 Fechado: a corretora informou que o ativo esta desabilitado ou suspenso.
 Nao confirmada: faltam dados, o codigo nao consta na lista ou a consulta falhou.
 O motivo aparece em Atividade ao vivo. O robo consulta novamente a cada minuto.
 Selecionar um par ou aumentar a expiracao nao garante que ele esteja aberto.
 O mesmo par disponivel em Digital nao confirma disponibilidade em Binarias/Turbo.
+
+CODIGOS DOS PARES (1.0.8)
+O robo procura o nome do par e sua variante -op na resposta da corretora.
+Usa o codigo confirmado para consultar os precos e enviar ordens. O motivo
+na aba Atividade ao vivo mostra o nome recebido e o codigo utilizado.
+Se houver mais de uma correspondencia aberta, o par fica bloqueado por
+ambiguidade. Pares realmente suspensos continuam bloqueados.

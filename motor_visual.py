@@ -35,10 +35,10 @@ if '--autoteste' in sys.argv:
     spec_teste.loader.exec_module(motor_teste)
     from iqoptionapi.constants import ACTIVES
     resposta = {'turbo': {'actives': {str(ACTIVES['EURUSD']):
-        {'enabled': 1, 'is_suspended': 0}}}}
-    assert motor_teste.interpretar_disponibilidade(resposta, ACTIVES, ['EURUSD'])['EURUSD'] is True
+        {'name': 'front.EURUSD', 'enabled': 1, 'is_suspended': 0}}}}
+    assert motor_teste.interpretar_disponibilidade(resposta, ['EURUSD'])['EURUSD'] is True
     resposta['turbo']['actives'][str(ACTIVES['EURUSD'])].pop('is_suspended')
-    assert motor_teste.interpretar_disponibilidade(resposta, ACTIVES, ['EURUSD'])['EURUSD'] is None
+    assert motor_teste.interpretar_disponibilidade(resposta, ['EURUSD'])['EURUSD'] is None
     assert Path(certifi.where()).is_file()
     contexto = ssl.create_default_context(cafile=certifi.where())
     print(json.dumps({'ok': True, 'frozen': bool(getattr(sys, 'frozen', False)),
