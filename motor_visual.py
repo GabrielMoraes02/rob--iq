@@ -3,6 +3,7 @@ import json
 import sys
 from pathlib import Path
 from caminhos import pasta_recursos, pasta_dados
+from catalogo import acompanhar_catalogo
 import expiracao_ordem  # Inclui o adaptador no motor empacotado.
 
 if '--teste-processo' in sys.argv:
@@ -122,6 +123,8 @@ class ContaPainel(ClasseOriginal):
                 publicar({'tipo': 'historico_erro'})
             saldo_stop = threading.Event()
             saldo_agora = threading.Event()
+            threading.Thread(target=acompanhar_catalogo,
+                             args=(self, saldo_stop, publicar), daemon=True).start()
             threading.Thread(target=acompanhar_saldo,
                              args=(self, saldo_stop, saldo_agora), daemon=True).start()
         return retorno

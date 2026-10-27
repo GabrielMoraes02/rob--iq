@@ -34,6 +34,8 @@ def instalar_compatibilidade(stable_api):
             global_value.check_websocket_if_error = False
             global_value.websocket_error_reason = None
             self.websocket_client = WebsocketClient(self)
+            from catalogo import instalar_consulta
+            instalar_consulta(self)
             # A biblioteca usa 'cacert.pem' relativo; no EXE os certificados
             # ficam dentro do pacote. Usar caminho absoluto e verificar TLS.
             self.websocket_thread = threading.Thread(target=self.websocket.run_forever,

@@ -98,6 +98,10 @@ class Painel:
         self.liquido = 0.0
         self.ids_resultados = set()
         self.registros = {}
+        self.catalogo_dados = []
+        self.catalogo_falhas = []
+        self.catalogo_consultado_em = None
+        self.catalogo_janela = None
         self.modo_sessao = 'simulacao'
         self.modo = tk.StringVar(value='simulacao')
         try:
@@ -319,6 +323,8 @@ class Painel:
         self.salvar_config.pack(fill='x', pady=(14, 6))
         self.escolher_pares = ttk.Button(config, textvariable=self.pares_texto, command=self.abrir_pares)
         self.escolher_pares.pack(fill='x', pady=(0, 6))
+        self.ver_catalogo = ttk.Button(config, text='Ver todos os ativos · busca e filtros', command=self.abrir_catalogo)
+        self.ver_catalogo.pack(fill='x', pady=(0, 6))
         self.label(config, variable=self.config_status, size=9).configure(wraplength=340)
         self.label(config, variable=self.nuvem_status, size=9).configure(wraplength=340)
         for title, value in [('Janela e sinais', 'Velas M1 · entrada até o segundo 29'), ('Conta permitida', 'Somente demonstração / PRACTICE')]:
@@ -373,6 +379,13 @@ class Painel:
         for par in self.ativos.get_children():
             self.ativos.item(par, values=(par, 'Aguardando' if par in selecionados else 'Não selecionado',
                                          'Conecte a sessão para acompanhar' if par in selecionados else 'Fora desta sessão · não envia ordens'))
+
+    def abrir_catalogo(self):
+        from catalogo_painel import CatalogoPainel
+        if self.catalogo_janela is not None and self.catalogo_janela.winfo_exists():
+            self.catalogo_janela.lift()
+            return
+        self.catalogo_janela = CatalogoPainel(self, BASE)
 
     def abrir_pares(self):
         if self.processo and self.processo.poll() is None:
@@ -467,6 +480,11 @@ class Painel:
             self.sincronizador_nuvem.parar.set()
         self.sincronizador_nuvem = None
         self.conta_historico = None
+        self.catalogo_dados = []
+        self.catalogo_falhas = []
+        self.catalogo_consultado_em = None
+        if self.catalogo_janela is not None:
+            self.catalogo_janela.atualizar()
         self.erro_sessao = ''
         self.ids_resultados.clear()
         self.entradas_ativas.clear()
@@ -828,7 +846,13 @@ class Painel:
 
     def atualizar_financeiro(self, dados):
         tipo = dados.get('tipo')
-        if tipo == 'conta_historico':
+        if tipo == 'catalogo':
+            self.catalogo_dados = dados.get('ativos', [])
+            self.catalogo_falhas = dados.get('falhas', [])
+            self.catalogo_consultado_em = dados.get('consultado_em')
+            if self.catalogo_janela is not None:
+                self.catalogo_janela.atualizar()
+        elif tipo == 'conta_historico':
             conta = str(dados['conta'])
             # Uma reconexão renova a sessão temporária da nuvem.
             if self.sincronizador_nuvem is not None:
@@ -916,6 +940,8 @@ class Painel:
         estava_parando = self.parando
         self.parando = False
         self.processo = None
+        if self.catalogo_janela is not None:
+            self.catalogo_janela.atualizar()
         self.bloquear_parametros(False)
         self.iniciar.configure(state='normal')
         self.parar.configure(state='disabled')

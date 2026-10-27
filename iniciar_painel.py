@@ -26,6 +26,12 @@ def autoteste(destino):
         for par, variavel in app.pares_config.items():
             variavel.set(par in selecionados)
         assert set(app.parametros_digitados()['pares']) == set(selecionados)
+        from catalogo import normalizar_catalogo
+        app.catalogo_dados = normalizar_catalogo('Opções', {k: {'actives': {'1': {'name': 'front.EURUSD', 'enabled': True, 'is_suspended': False}}} for k in ('binary', 'turbo', 'blitz')})
+        app.ver_catalogo.invoke()
+        app.catalogo_janela.modalidade.set('Blitz')
+        assert len(app.catalogo_janela.tabela.get_children()) == 1
+        app.catalogo_janela.fechar()
         app.sem_recuo_opcao.invoke()
         assert app.parametros_digitados()['sem_recuo'] is True
         assert str(app.campos_config[0].cget('state')) == 'disabled'
@@ -77,7 +83,7 @@ def autoteste(destino):
             'tls_inicializado': contexto.verify_mode == ssl.CERT_REQUIRED,
             'titulo': root.title(), 'destaque_de_entrada_testado': True,
             'pares_disponiveis': len(app.pares_config), 'selecao_de_pares_testada': True,
-            'expiracao_30s_testada': True, 'opcao_sem_recuo_testada': True,
+            'expiracao_30s_testada': True, 'opcao_sem_recuo_testada': True, 'catalogo_e_filtros_testados': True,
             'botao_parar_encerrou_motor_e_filho': True,
             'dados_fora_do_executavel': pasta_dados() != pasta_recursos(),
             'painel_sem_login': True, 'nenhuma_ordem_enviada': True}

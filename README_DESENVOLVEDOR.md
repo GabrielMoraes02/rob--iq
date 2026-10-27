@@ -1,4 +1,4 @@
-# Código-fonte do Bot Marcos — Windows 1.0.9
+# Código-fonte do Bot Marcos — Windows 1.0.10
 
 Esta pasta é o projeto original editável. O executável é gerado a partir
 destes arquivos; alterar o código não modifica um EXE que já foi gerado.
@@ -60,7 +60,7 @@ Uma versão Windows deve ser gerada no Windows; este build não gera `.app`.
 ## O que o comando entrega
 
 - `dist-windows\BotMarcos.exe`: aplicativo final para o cliente, com o motor e o Python incluídos.
-- `dist-windows\BOT_MARCOS_WINDOWS_1.0.9.zip`: pacote com o EXE e `LEIA-ME.txt`.
+- `dist-windows\BOT_MARCOS_WINDOWS_1.0.10.zip`: pacote com o EXE e `LEIA-ME.txt`.
 - `dist-motor\MotorMarcos.exe`: componente interno; não é o arquivo para o cliente abrir.
 - `build-*`: arquivos intermediários; não precisam ser enviados ao cliente.
 
@@ -208,3 +208,27 @@ Bolinha anterior, seta da mesma direcao, cancelamento contrario, prazo de
 29 segundos, disponibilidade, PRACTICE e limite por vela continuam obrigatorios.
 O evento ENTRADA_SEM_RECUO identifica a condicao atingida; DEMO_ENVIADA
 continua dependendo da aceitacao da ordem pela corretora.
+
+## Catalogo de consulta (1.0.10)
+
+`catalogo.py` consulta get-initialization-data v4 (binary/turbo/blitz),
+digital-option-instruments.get-underlying-list v3 e get-instruments v4
+(forex/cfd/crypto). A resposta v4 e interceptada por request_id exclusivo
+antes de chegar aos handlers da SDK, preservando a consulta v3 do motor.
+Os endpoints e formatos foram conferidos no codigo da SDK instalada e em
+https://github.com/celiovmjr/iq-core/blob/main/iq_core/services/instrument_service.py
+Nao ha dependencia nova nem codigo de terceiros executado para isso.
+
+Um worker de consulta e iniciado junto da conta PRACTICE e encerrado com
+a sessao. Consultas tem espera limitada e falhas parciais sao publicadas
+sem corpo de erro bruto. Nao reconecta nem autentica por conta propria.
+A thread publica somente campos permitidos de instrumentos (nome, ticker,
+modalidade, grupo, disponibilidade, retorno quando informado).
+
+`catalogo_painel.py` fornece busca, modalidade, OTC, disponibilidade e
+watchlist local. Nao altera ACTIVES nem a configuracao de pares. O mesmo
+ativo em duas modalidades ocupa duas linhas. Fechar a sessao mantem a ultima
+consulta marcada como antiga; uma nova sessao limpa o catalogo anterior.
+A lista depende do retorno da conta/regiao e pode diferir dos destaques e
+rankings da interface web. Nao inventa percentuais, tendencias ou mercados
+que a API nao retornou. Nao habilita negociacao em Blitz/Digital/Margem.

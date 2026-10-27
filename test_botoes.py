@@ -11,6 +11,8 @@ import painel
 
 class Botoes(unittest.TestCase):
     def setUp(self):
+        import gc
+        gc.collect()  # Objetos Tk de testes anteriores sao liberados na thread principal.
         self.temp = tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1]/'.bot-temp')
         self.base = patch.object(painel, 'BASE', Path(self.temp.name))
         self.base.start()
@@ -28,6 +30,9 @@ class Botoes(unittest.TestCase):
         self.base.stop()
         self.temp.cleanup()
         self.assertEqual(self.erros, [])
+        self.app = self.root = None
+        import gc
+        gc.collect()
 
     def filhos(self, pai):
         for filho in pai.winfo_children():
@@ -66,6 +71,32 @@ class Botoes(unittest.TestCase):
         self.assertFalse(self.app.config_sem_recuo.get())
         self.assertEqual(str(self.app.campos_config[0].cget('state')), 'normal')
         self.assertEqual(self.app.config_pips.get(), '2')
+
+    def test_catalogo_filtra_favorita_e_nao_altera_operacao(self):
+        from catalogo import normalizar_catalogo
+        from test_catalogo import resposta_opcoes
+        antes = self.app.parametros_digitados()
+        self.app.catalogo_dados = normalizar_catalogo('Opções', resposta_opcoes())
+        self.app.catalogo_consultado_em = time.time()
+        self.app.ver_catalogo.invoke()
+        janela = self.app.catalogo_janela
+        self.assertEqual(len(janela.tabela.get_children()), 3)
+        janela.modalidade.set('Blitz')
+        janela.busca.set('EUR/USD')
+        self.assertEqual(janela.tabela.get_children(), ('Blitz:76',))
+        janela.tabela.selection_set('Blitz:76')
+        janela.alternar_favorito()
+        self.assertIn('Blitz:76', janela.favoritos)
+        janela.fechar()
+        self.assertIsNone(self.root.grab_current())
+        self.app.ver_catalogo.invoke()
+        janela = self.app.catalogo_janela
+        janela.somente_favoritos.set(True)
+        janela.atualizar()
+        self.assertEqual(janela.tabela.get_children(), ('Blitz:76',))
+        self.assertEqual(self.app.parametros_digitados(), antes)
+        self.assertIsNone(self.app.processo)
+        janela.fechar()
 
     def test_abas_e_historico_abrem_e_fecham(self):
         for botao, _, _, chave in self.app.nav_items:
