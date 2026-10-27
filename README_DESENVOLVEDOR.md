@@ -1,4 +1,4 @@
-# Código-fonte do Bot Marcos — Windows 1.0.5
+# Código-fonte do Bot Marcos — Windows 1.0.6
 
 Esta pasta é o projeto original editável. O executável é gerado a partir
 destes arquivos; alterar o código não modifica um EXE que já foi gerado.
@@ -60,7 +60,7 @@ Uma versão Windows deve ser gerada no Windows; este build não gera `.app`.
 ## O que o comando entrega
 
 - `dist-windows\BotMarcos.exe`: aplicativo final para o cliente, com o motor e o Python incluídos.
-- `dist-windows\BOT_MARCOS_WINDOWS_1.0.5.zip`: pacote com o EXE e `LEIA-ME.txt`.
+- `dist-windows\BOT_MARCOS_WINDOWS_1.0.6.zip`: pacote com o EXE e `LEIA-ME.txt`.
 - `dist-motor\MotorMarcos.exe`: componente interno; não é o arquivo para o cliente abrir.
 - `build-*`: arquivos intermediários; não precisam ser enviados ao cliente.
 
@@ -158,3 +158,17 @@ recusa não dispara fallback ou reenvio com outro prazo. O evento
 O envio é testado com corretora simulada. A aceitação e o vencimento efetivo
 devem ser validados na DEMO; o prazo não é garantido por um teste local.
 Veja [a referência técnica](referencias/EXPIRACAO_30S.md).
+
+## Parada do executável (1.0.6)
+
+O onefile cria um bootloader e um processo filho. Usar apenas terminate()
+no bootloader deixava o motor filho com stdout aberto, mantinha os controles
+bloqueados e podia continuar o acompanhamento. `processos.py` usa taskkill
+com /T /F no Windows e grupo próprio no macOS, limitado ao PID do motor.
+A parada ocorre em uma thread; a interface recebe a confirmação pela fila
+e só então volta ao estado parado. Fechar a janela também espera a parada.
+
+`test_botoes.py` exercita os callbacks dos controles, sem login real ou
+ordens. O autoteste do EXE inicia um MotorMarcos inerte com --teste-processo,
+clica no botão de parada e verifica a ausência do processo filho. Esse modo
+inerte não se conecta à corretora e não executa o motor de negociação.

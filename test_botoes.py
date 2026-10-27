@@ -1,0 +1,131 @@
+import io
+import json
+import tempfile
+import time
+import tkinter as tk
+import unittest
+from pathlib import Path
+from unittest.mock import Mock, patch
+import painel
+
+
+class Botoes(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1]/'.bot-temp')
+        self.base = patch.object(painel, 'BASE', Path(self.temp.name))
+        self.base.start()
+        self.root = tk.Tk()
+        self.root.attributes('-alpha', 0.0)
+        self.erros = []
+        self.root.report_callback_exception = lambda tipo, valor, tb: self.erros.append((tipo.__name__, str(valor)))
+        self.app = painel.Painel(self.root)
+        self.app.som_ativo.set(False)
+        self.root.update()
+
+    def tearDown(self):
+        for timer in self.root.tk.call('after', 'info'): self.root.after_cancel(timer)
+        self.root.destroy()
+        self.base.stop()
+        self.temp.cleanup()
+        self.assertEqual(self.erros, [])
+
+    def filhos(self, pai):
+        for filho in pai.winfo_children():
+            yield filho
+            yield from self.filhos(filho)
+
+    def botao(self, pai, texto):
+        return next(w for w in self.filhos(pai) if w.winfo_class() in ('TButton', 'Button') and str(w.cget('text')).startswith(texto))
+
+    def test_abas_e_historico_abrem_e_fecham(self):
+        for botao, _, _, chave in self.app.nav_items:
+            botao.invoke()
+            self.assertEqual(self.app.current_page, chave)
+        self.app.navigate('inicio')
+        self.botao(self.app.inicio_conteudo, 'Histórico de transações').invoke()
+        self.root.update()
+        self.assertIsNotNone(self.app.janela_resultados)
+        self.botao(self.app.janela_resultados, '×').invoke()
+        self.assertIsNone(self.app.janela_resultados)
+        self.assertIsNone(self.root.grab_current())
+        self.botao(self.app.inicio_conteudo, 'Abrir atividade ao vivo').invoke()
+        self.assertEqual(self.app.current_page, 'atividade')
+
+    def test_pares_aplicar_fechar_e_salvar_parametros(self):
+        self.app.escolher_pares.invoke()
+        self.root.update()
+        modal = self.root.grab_current()
+        self.assertIsNotNone(modal)
+        self.botao(modal, 'Aplicar e salvar pares').invoke()
+        self.assertIsNone(self.root.grab_current())
+        self.app.escolher_pares.invoke()
+        self.botao(self.root.grab_current(), '×').invoke()
+        self.assertIsNone(self.root.grab_current())
+        self.app.config_expiracao.set('30 segundos')
+        self.app.salvar_config.invoke()
+        self.assertEqual(json.loads((Path(self.temp.name)/'configuracao.json').read_text())['expiracao'], 0.5)
+
+    def test_conectar_valida_e_executa_com_motor_falso(self):
+        with patch.object(painel.messagebox, 'showinfo') as aviso:
+            self.app.iniciar.invoke()
+            aviso.assert_called_once()
+        self.app.opcoes_modo[1].invoke()
+        self.assertEqual(self.app.modo.get(), 'demo')
+        self.app.opcoes_modo[0].invoke()
+        self.app.email.insert(0, 'teste@exemplo.test')
+        self.app.senha.insert(0, 'senha-ficticia')
+        processo = Mock(stdin=io.StringIO(), stdout=iter([]))
+        processo.poll.return_value = None
+        processo.wait.return_value = 0
+        with patch.object(painel.subprocess, 'Popen', return_value=processo) as abrir:
+            self.app.iniciar.invoke()
+            abrir.assert_called_once()
+            limite = time.monotonic()+2
+            while self.app.processo is not None and time.monotonic() < limite:
+                self.app.poll()
+                self.root.update()
+                time.sleep(0.01)
+        self.assertIsNone(self.app.processo)
+        self.assertEqual(str(self.app.iniciar.cget('state')), 'normal')
+
+    def test_ambos_botoes_parar_liberam_os_controles(self):
+        for botao in (self.app.parar_inicio, self.app.parar):
+            processo = Mock()
+            processo.poll.return_value = None
+            self.app.processo = processo
+            self.app.bloquear_parametros(True)
+            self.app.iniciar.configure(state='disabled')
+            botao.configure(state='normal')
+            with patch.object(painel, 'encerrar_motor') as encerrar:
+                botao.invoke()
+                limite=time.monotonic()+2
+                while self.app.processo is not None and time.monotonic()<limite:
+                    self.app.poll(); self.root.update(); time.sleep(0.01)
+                encerrar.assert_called_once_with(processo)
+            self.assertIsNone(self.app.processo)
+            self.assertFalse(self.app.parando)
+            self.assertEqual(str(self.app.iniciar.cget('state')), 'normal')
+            self.assertEqual(str(self.app.escolher_pares.cget('state')), 'normal')
+            self.assertEqual(str(self.app.parar.cget('state')), 'disabled')
+
+    def test_parar_sem_sessao_nao_fica_parando(self):
+        self.app.stop()
+        self.assertFalse(self.app.parando)
+        self.assertNotIn('Parando', self.app.status.get())
+
+    def test_fechar_painel_espera_confirmacao_do_encerramento(self):
+        processo = Mock()
+        processo.poll.return_value = None
+        self.app.processo = processo
+        with patch.object(painel, 'encerrar_motor') as encerrar, patch.object(self.app, 'destruir_painel') as destruir:
+            self.app.close()
+            self.assertTrue(self.app.fechar_apos_parada)
+            destruir.assert_not_called()
+            limite = time.monotonic()+2
+            while self.app.processo is not None and time.monotonic()<limite:
+                self.app.poll(); self.root.update(); time.sleep(0.01)
+            encerrar.assert_called_once_with(processo)
+            destruir.assert_called_once()
+
+
+if __name__ == '__main__': unittest.main()

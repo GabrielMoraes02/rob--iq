@@ -1,4 +1,4 @@
-BOT MARCOS - WINDOWS 1.0.5
+BOT MARCOS - WINDOWS 1.0.6
 
 1. Extraia o ZIP inteiro para uma pasta do seu computador.
 2. Abra BotMarcos.exe com dois cliques.
@@ -19,7 +19,7 @@ A senha nao e salva. Ao reabrir o programa, entre novamente na conta.
 Nao precisa instalar Python, Tkinter ou executar arquivos CMD.
 O programa ja inclui as dependencias. A primeira abertura pode levar alguns
 segundos. E necessario acesso a internet para a corretora e o historico.
-Confira 'Windows 1.0.5' no titulo da janela. Feche a versao anterior antes
+Confira 'Windows 1.0.6' no titulo da janela. Feche a versao anterior antes
 de abrir esta; nao execute dois robos na mesma conta ao mesmo tempo.
 
 Quando uma ordem DEMO for aceita, o topo do painel destaca o par, CALL/PUT,
@@ -99,3 +99,12 @@ O prazo depende de aceitacao da corretora para o ativo e horario. Se houver
 recusa, ela aparece na Atividade ao vivo; nao ocorre tentativa com outro prazo.
 Confira o vencimento efetivo nos detalhes da ordem na IQ Option DEMO.
 As velas dos sinais continuam em M1; apenas a expiracao solicitada muda.
+
+PARAR E FECHAR O ROBO
+Parar bot e Encerrar sessao desligam o motor e seus processos filhos.
+Aguarde a confirmacao de Bot parado. O botao Conectar e as configuracoes
+sao liberados novamente depois do encerramento. Se a parada falhar, o
+painel informa que ela nao foi confirmada e permite tentar novamente.
+Ao fechar a janela, o painel espera encerrar o motor antes de sair.
+Isso impede novas entradas; ordens ja abertas seguem ate o vencimento
+na corretora e devem ser conferidas diretamente na IQ Option.

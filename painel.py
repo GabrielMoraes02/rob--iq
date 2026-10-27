@@ -16,6 +16,7 @@ from tkinter import ttk, messagebox
 from configuracao import PADRAO, PARES_DISPONIVEIS, OPCOES_EXPIRACAO, formatar_expiracao, carregar_configuracao, salvar_configuracao, validar_configuracao
 from historico_nuvem import Historico, Sincronizador
 from caminhos import pasta_dados, comando_motor, VERSAO
+from processos import encerrar_motor
 
 BASE = pasta_dados()
 EXPLICACOES = {
@@ -84,6 +85,9 @@ class Painel:
     def __init__(self, root):
         self.root = root
         self.processo = None
+        self.parando = False
+        self.fechar_apos_parada = False
+        self.encerrado = False
         self.fila = queue.Queue()
         self.conta_historico = None
         self.sincronizador_nuvem = None
@@ -464,7 +468,7 @@ class Painel:
         self.modo_sessao = modo
         self.ordens = 0
         try:
-            self.processo = subprocess.Popen(comando_motor(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace', cwd=BASE, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if sys.platform == 'win32' else 0, env={**__import__('os').environ, 'PYTHONIOENCODING': 'utf-8', 'PYINSTALLER_RESET_ENVIRONMENT': '1'})
+            self.processo = subprocess.Popen(comando_motor(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace', cwd=BASE, start_new_session=sys.platform != 'win32', creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if sys.platform == 'win32' else 0, env={**__import__('os').environ, 'PYTHONIOENCODING': 'utf-8', 'PYINSTALLER_RESET_ENVIRONMENT': '1'})
             self.processo.stdin.write(json.dumps({'email': self.email.get().strip(), 'senha': self.senha.get(), 'modo': self.modo_sessao, 'configuracao': parametros}) + '\n')
             self.processo.stdin.flush()
             self.processo.stdin.close()
@@ -677,6 +681,14 @@ class Painel:
         try:
             while True:
                 linha = self.fila.get_nowait()
+                if isinstance(linha, tuple) and linha[0] == 'falha_parada':
+                    if linha[1] is self.processo:
+                        self.parando = False
+                        self.status.set('Não foi possível confirmar a parada · tente Parar bot novamente.')
+                        self.parar.configure(state='normal')
+                        self.parar_inicio.configure(state='normal')
+                        self.evento('', 'SISTEMA', 'Falha ao encerrar o motor.', linha[2])
+                    continue
                 if isinstance(linha, tuple) and linha[0] == 'saida':
                     if linha[1] is not self.processo:
                         continue
@@ -694,22 +706,9 @@ class Painel:
                     continue
                 if isinstance(linha, tuple):
                     if linha[1] is self.processo:
-                        self.bloquear_parametros(False)
-                        self.iniciar.configure(state='normal')
-                        self.parar.configure(state='disabled')
-                        self.parar_inicio.configure(state='disabled')
-                        for opcao in self.opcoes_modo:
-                            opcao.configure(state='normal')
-                        for ativo in self.ativos.get_children():
-                            valores = self.ativos.item(ativo, 'values')
-                            self.ativos.item(ativo, values=(ativo, valores[1], 'Bot parado — não acompanha novos sinais'))
-                        self.status.set(self.erro_sessao or 'Parado • A sessão terminou. Veja o histórico para identificar o motivo.')
-                        if self.conta_historico is None:
-                            self.nuvem_status.set('Histórico na nuvem · aguardando conexão com a corretora.')
-                        self.processo = None
-                        self.ultimo_saldo_recebido = None
-                        self.saldo_valor.set('—')
-                        self.saldo_texto.set('Sessão encerrada · conecte para consultar o saldo atual.')
+                        self.finalizar_sessao()
+                        if self.encerrado:
+                            return
                     continue
                 if 'Conta confirmada: PRACTICE' in linha:
                     self.navigate('atividade')
@@ -878,12 +877,55 @@ class Painel:
             self.detalhe.configure(state='disabled')
 
     def stop(self):
-        if self.processo and self.processo.poll() is None:
-            self.processo.terminate()
-        self.status.set('Parando o bot… Ordens DEMO já abertas continuam na corretora.')
+        if self.parando:
+            return
+        processo = self.processo
+        if processo is None or processo.poll() is not None:
+            self.finalizar_sessao()
+            return
+        self.parando = True
+        self.parar.configure(state='disabled')
+        self.parar_inicio.configure(state='disabled')
+        self.status.set('Parando o motor… Ordens DEMO já abertas continuam na corretora.')
+        def encerrar():
+            try:
+                encerrar_motor(processo)
+                self.fila.put(('parada', processo))
+            except Exception as erro:
+                self.fila.put(('falha_parada', processo, str(erro)))
+        threading.Thread(target=encerrar, daemon=True).start()
+
+    def finalizar_sessao(self):
+        estava_parando = self.parando
+        self.parando = False
+        self.processo = None
+        self.bloquear_parametros(False)
+        self.iniciar.configure(state='normal')
+        self.parar.configure(state='disabled')
+        self.parar_inicio.configure(state='disabled')
+        for opcao in self.opcoes_modo:
+            opcao.configure(state='normal')
+        for ativo in self.ativos.get_children():
+            valores = self.ativos.item(ativo, 'values')
+            self.ativos.item(ativo, values=(ativo, valores[1], 'Bot parado — não acompanha novos sinais'))
+        self.status.set(self.erro_sessao or ('Bot parado · não envia novas ordens. Ordens abertas continuam na corretora.' if estava_parando else 'Sessão parada · conecte sua conta para começar.'))
+        if self.conta_historico is None:
+            self.nuvem_status.set('Histórico na nuvem · aguardando conexão com a corretora.')
+        self.ultimo_saldo_recebido = None
+        self.saldo_valor.set('—')
+        self.saldo_texto.set('Sessão encerrada · conecte para consultar o saldo atual.')
+        if self.fechar_apos_parada:
+            self.destruir_painel()
 
     def close(self):
-        self.stop()
+        if self.processo is not None and self.processo.poll() is None:
+            self.fechar_apos_parada = True
+            self.stop()
+            return
+        self.destruir_painel()
+
+    def destruir_painel(self):
+        self.encerrado = True
         if self.sincronizador_nuvem is not None:
             self.sincronizador_nuvem.parar.set()
         self.root.destroy()

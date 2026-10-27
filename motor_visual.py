@@ -5,6 +5,14 @@ from pathlib import Path
 from caminhos import pasta_recursos, pasta_dados
 import expiracao_ordem  # Inclui o adaptador no motor empacotado.
 
+if '--teste-processo' in sys.argv:
+    # Processo inerte para testar a parada do EXE sem autenticação ou ordens.
+    import os
+    import time
+    print(json.dumps({'teste_processo': True, 'pid': os.getpid()}), flush=True)
+    while True:
+        time.sleep(1)
+
 if '--diagnostico-conexao' in sys.argv:
     from conexao_iq import diagnosticar_transporte
     print(json.dumps(diagnosticar_transporte()), flush=True)

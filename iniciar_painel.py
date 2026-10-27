@@ -45,12 +45,37 @@ def autoteste(destino):
             raise RuntimeError('Motor interno falhou: ' + retorno.stderr[-2000:])
         motor = json.loads(retorno.stdout.strip())
         assert motor['ok']
+        # Exercita o botão real contra um motor EXE inerte e seu bootloader.
+        import time
+        from processos import encerrar_motor, processo_ativo
+        processo = subprocess.Popen(comando_motor()+['--teste-processo'], stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, encoding='utf-8',
+            start_new_session=sys.platform != 'win32',
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+            env={**os.environ, 'PYINSTALLER_RESET_ENVIRONMENT': '1'})
+        try:
+            filho = json.loads(processo.stdout.readline())['pid']
+            assert processo_ativo(filho)
+            app.processo = processo
+            app.parar_inicio.configure(state='normal')
+            app.parar_inicio.invoke()
+            limite = time.monotonic()+15
+            while app.processo is not None and time.monotonic()<limite:
+                root.update()
+                time.sleep(0.05)
+            assert app.processo is None and not processo_ativo(filho)
+            assert str(app.iniciar.cget('state')) == 'normal'
+        finally:
+            if processo.poll() is None:
+                encerrar_motor(processo)
+            processo.stdout.close()
         relatorio = {'ok': True, 'executavel_independente': bool(getattr(sys, 'frozen', False)),
             'tkinter': str(tk.TkVersion), 'motor': motor,
             'tls_inicializado': contexto.verify_mode == ssl.CERT_REQUIRED,
             'titulo': root.title(), 'destaque_de_entrada_testado': True,
             'pares_disponiveis': len(app.pares_config), 'selecao_de_pares_testada': True,
             'expiracao_30s_testada': True,
+            'botao_parar_encerrou_motor_e_filho': True,
             'dados_fora_do_executavel': pasta_dados() != pasta_recursos(),
             'painel_sem_login': True, 'nenhuma_ordem_enviada': True}
         Path(destino).write_text(json.dumps(relatorio, ensure_ascii=False, indent=2), encoding='utf-8')
