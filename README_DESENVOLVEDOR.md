@@ -1,4 +1,4 @@
-# Código-fonte do Bot Marcos — Windows 1.0.3
+# Código-fonte do Bot Marcos — Windows 1.0.4
 
 Esta pasta é o projeto original editável. O executável é gerado a partir
 destes arquivos; alterar o código não modifica um EXE que já foi gerado.
@@ -60,7 +60,7 @@ Uma versão Windows deve ser gerada no Windows; este build não gera `.app`.
 ## O que o comando entrega
 
 - `dist-windows\BotMarcos.exe`: aplicativo final para o cliente, com o motor e o Python incluídos.
-- `dist-windows\BOT_MARCOS_WINDOWS_1.0.3.zip`: pacote com o EXE e `LEIA-ME.txt`.
+- `dist-windows\BOT_MARCOS_WINDOWS_1.0.4.zip`: pacote com o EXE e `LEIA-ME.txt`.
 - `dist-motor\MotorMarcos.exe`: componente interno; não é o arquivo para o cliente abrir.
 - `build-*`: arquivos intermediários; não precisam ser enviados ao cliente.
 
@@ -127,3 +127,19 @@ Os testes incluem CALL e PUT na mesma vela, recusa de transferência para a
 próxima, bloqueios DEMO/REAL, recuo sem seta, sinal contrário e seleção de pares.
 É necessário comparar timestamps e gráfico em DEMO; os testes locais não
 comprovam correspondência visual em tempo real nem resultados financeiros.
+
+## Abas Início e Atividade ao vivo (1.0.4)
+
+O Início reúne os campos de login, saldo, resultados, histórico, parâmetros
+e pares selecionados. O conteúdo permite rolagem em janelas menores.
+A confirmação PRACTICE abre a Atividade ao vivo, que mostra os mercados e
+eventos somente da sessão atual. Atualizações do Supabase atualizam o resumo
+e o histórico de transações sem substituir os eventos ao vivo.
+Essa reorganização não altera as regras do motor nem exclui dados salvos.
+
+## Versionamento
+
+Por orientação do responsável pelo projeto, toda alteração concluída deve
+ser salva em um commit próprio e enviada ao repositório GitHub configurado.
+Inclua os testes e a documentação da mudança. Não versione credenciais,
+históricos, ambientes locais ou executáveis gerados.

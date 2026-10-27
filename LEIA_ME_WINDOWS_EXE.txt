@@ -1,11 +1,11 @@
-BOT MARCOS - WINDOWS 1.0.3
+BOT MARCOS - WINDOWS 1.0.4
 
 1. Extraia o ZIP inteiro para uma pasta do seu computador.
 2. Abra BotMarcos.exe com dois cliques.
 3. Entre com sua conta da IQ Option.
 
 PRIMEIRA UTILIZACAO
-Na pagina Conexao, preencha o e-mail e a senha da IQ Option e escolha o modo.
+Na aba Inicio, preencha o e-mail e a senha da IQ Option e escolha o modo.
 'So observar' acompanha os precos sem enviar ordens. 'DEMO automatica' envia
 ordens com saldo virtual, depois da confirmacao exibida pelo programa.
 Confira recuo em pips, valor por entrada e expiracao e clique Salvar parametros.
@@ -19,7 +19,7 @@ A senha nao e salva. Ao reabrir o programa, entre novamente na conta.
 Nao precisa instalar Python, Tkinter ou executar arquivos CMD.
 O programa ja inclui as dependencias. A primeira abertura pode levar alguns
 segundos. E necessario acesso a internet para a corretora e o historico.
-Confira 'Windows 1.0.3' no titulo da janela. Feche a versao anterior antes
+Confira 'Windows 1.0.4' no titulo da janela. Feche a versao anterior antes
 de abrir esta; nao execute dois robos na mesma conta ao mesmo tempo.
 
 Quando uma ordem DEMO for aceita, o topo do painel destaca o par, CALL/PUT,
@@ -49,8 +49,8 @@ WIN significa ganho, LOSS significa perda e EMPATE significa lucro zero.
 O preco exato executado e o vencimento devem ser conferidos na corretora.
 
 COMO CONSULTAR O HISTORICO
-Na Visao geral, clique Historico de transacoes ou em um dos cartoes do dia.
-Use os filtros e as datas para consultar outros periodos. A pagina Atividade
+Na aba Inicio, clique Historico de transacoes ou em um dos cartoes do dia.
+Use os filtros e as datas para consultar outros periodos. A aba Atividade ao vivo
 mostra sinais, descartes, recusas e detalhes da sessao. Apenas operacoes
 geradas pelo robo nesta versao entram no historico da nuvem; nao ha importacao
 automatica de operacoes antigas ou realizadas manualmente na corretora.
@@ -61,7 +61,7 @@ confira o resultado delas na IQ Option. Minimizar a janela nao encerra o robo.
 Para voltar depois de fechar, abra BotMarcos.exe e faca login novamente.
 
 SE APARECER UMA FALHA
-Confira a internet e o motivo na pagina Atividade. Se a sessao terminou,
+Confira a internet e o motivo na aba Atividade ao vivo. Se a sessao terminou,
 ela nao esta acompanhando os pares. Se esta conectada mas nao entra, pode
 estar aguardando que sinal, confirmacao e recuo cumpram as regras.
 Se o historico ficar sem conexao, a fila local e preservada para nova tentativa.
@@ -81,3 +81,12 @@ e sera reenviada quando abrir novamente e entrar na mesma conta.
 
 Este pacote nao contem senha, sessao, historico pessoal nem chave administrativa.
 Versao para Windows 64 bits. O arquivo EXE nao funciona no macOS.
+
+ABAS DO PAINEL
+Inicio: login, saldo, resultados e historico da conta. Mais abaixo ficam
+os parametros e a escolha dos pares; use a barra de rolagem quando necessario.
+Atividade ao vivo: mercados, sinais, entradas e resultados somente da sessao
+atual. Depois que a conta e confirmada, esta aba abre automaticamente.
+Voce pode voltar ao Inicio a qualquer momento para conferir saldo e historico.
+Os eventos antigos nao sao misturados com a atividade ao vivo; as transacoes
+salvas continuam disponiveis no historico do Inicio e no Supabase.

@@ -150,12 +150,12 @@ class Painel:
         # Fixed content gutter; navigation expands over it without resizing the data.
         content = tk.Frame(root, bg=self.bg)
         self.content = content
-        content.pack(fill='both', expand=True, padx=(104, 30), pady=26)
+        content.pack(fill='both', expand=True, padx=(240, 24), pady=20)
         top = tk.Frame(content, bg=self.bg)
         top.pack(fill='x', pady=(0, 22))
         st.configure('TCheckbutton', background=self.bg, foreground=self.muted, padding=6)
         st.map('TCheckbutton', background=[('active', self.bg)])
-        self.page_title = tk.StringVar(value='Visão geral')
+        self.page_title = tk.StringVar(value='Início')
         tk.Label(top, text='Painel IQ Option', bg=self.bg, fg='#969ba8', font=('Segoe UI Variable Text', 9, 'bold')).pack(anchor='w')
         tk.Label(top, textvariable=self.page_title, bg=self.bg, fg='#f4f5f7', font=('Segoe UI Variable Display', 25)).pack(side='left', pady=(4, 0))
         tk.Label(top, text='●  Ambiente demo', bg='#233b31', fg='#65c78b', padx=16, pady=8, font=('Segoe UI Variable Text', 10)).pack(side='right')
@@ -164,7 +164,7 @@ class Painel:
         statusbar.pack(fill='x', pady=(0, 22))
         self.parar_inicio = ttk.Button(statusbar, text='■  Parar bot', command=self.stop, style='Stop.TButton', state='disabled')
         self.parar_inicio.pack(side='right', padx=(10, 0))
-        ttk.Button(statusbar, text='Conexão  →', command=lambda: self.navigate('conexao')).pack(side='right', padx=(10, 0))
+        ttk.Button(statusbar, text='Início  →', command=lambda: self.navigate('inicio')).pack(side='right', padx=(10, 0))
         status_textos = tk.Frame(statusbar, bg='#252830')
         status_textos.pack(side='left', fill='x', expand=True)
         tk.Label(status_textos, textvariable=self.status, bg='#252830', fg='#b9bfcc', anchor='w', wraplength=650, font=('Segoe UI Variable Text', 10)).pack(fill='x')
@@ -179,12 +179,30 @@ class Painel:
         host.rowconfigure(0, weight=1)
         host.columnconfigure(0, weight=1)
         self.pages = {}
-        for key in ('resumo', 'atividade', 'conexao', 'ajuda'):
+        for key in ('inicio', 'atividade', 'ajuda'):
             page = tk.Frame(host, bg=self.bg)
             page.grid(row=0, column=0, sticky='nsew')
             self.pages[key] = page
-        main = self.pages['resumo']
-        cards = tk.Frame(main, bg=self.bg)
+        # Início reúne login, saldo, resultados e parâmetros em uma página rolável.
+        self.inicio_canvas = tk.Canvas(self.pages['inicio'], bg=self.bg, highlightthickness=0)
+        inicio_scroll = ttk.Scrollbar(self.pages['inicio'], orient='vertical', command=self.inicio_canvas.yview)
+        inicio_scroll.pack(side='right', fill='y')
+        self.inicio_canvas.pack(side='left', fill='both', expand=True)
+        self.inicio_canvas.configure(yscrollcommand=inicio_scroll.set)
+        main = tk.Frame(self.inicio_canvas, bg=self.bg)
+        self.inicio_conteudo = main
+        inicio_janela = self.inicio_canvas.create_window((0, 0), window=main, anchor='nw')
+        main.bind('<Configure>', lambda e: self.inicio_canvas.configure(scrollregion=self.inicio_canvas.bbox('all')))
+        self.inicio_canvas.bind('<Configure>', lambda e: self.inicio_canvas.itemconfigure(inicio_janela, width=e.width))
+        inicio_colunas = tk.Frame(main, bg=self.bg)
+        inicio_colunas.pack(fill='x')
+        inicio_colunas.columnconfigure(0, weight=1, uniform='inicio')
+        inicio_colunas.columnconfigure(1, weight=1, uniform='inicio')
+        login_parent = tk.Frame(inicio_colunas, bg=self.bg)
+        login_parent.grid(row=0, column=0, sticky='nsew', padx=(0, 20))
+        resumo_parent = tk.Frame(inicio_colunas, bg=self.bg)
+        resumo_parent.grid(row=0, column=1, sticky='nsew')
+        cards = tk.Frame(resumo_parent, bg=self.bg)
         cards.pack(fill='x')
         for i, (titulo, var, nota, cor) in enumerate([
             ('Saldo disponível demo', self.saldo_valor, 'Informado pela corretora', '#e9eaef'),
@@ -192,11 +210,12 @@ class Painel:
             ('Ganhos do dia', self.ganhos_valor, 'Confirmados', '#65c78b'),
             ('Perdas do dia', self.perdas_valor, 'Confirmados', '#ef7c86'),
             ('Taxa de acerto', self.taxa_valor, 'Ganhos / concluídas', '#e9eaef')]):
-            cards.columnconfigure(i, weight=1, uniform='cards')
-            card = tk.Frame(cards, bg=self.surface, padx=18, pady=20, highlightbackground='#343741', highlightthickness=1)
-            card.grid(row=0, column=i, sticky='nsew', padx=(0 if i == 0 else 12, 0))
+            cards.columnconfigure(0, weight=1, uniform='cards')
+            cards.columnconfigure(1, weight=1, uniform='cards')
+            card = tk.Frame(cards, bg=self.surface, padx=14, pady=14, highlightbackground='#343741', highlightthickness=1)
+            card.grid(row=0 if i == 0 else 1+(i-1)//2, column=0 if i == 0 else (i-1)%2, columnspan=2 if i == 0 else 1, sticky='nsew', padx=(0 if i == 0 or i%2 else 8, 0), pady=(0, 8))
             self.label(card, titulo, color='#a1a6b4', size=9)
-            value = self.label(card, variable=var, color=cor, size=25, display=True)
+            value = self.label(card, variable=var, color=cor, size=22, display=True)
             if i == 1:
                 self.liquido_label = value
             self.label(card, 'Ver histórico  ↗' if i > 0 else nota, color='#a1a6b4', size=9)
@@ -205,29 +224,32 @@ class Painel:
                 for widget in [card, *card.winfo_children()]:
                     widget.configure(cursor='hand2')
                     widget.bind('<Button-1>', lambda event, f=filtro: self.abrir_resultados(f))
-        ttk.Label(main, textvariable=self.saldo_texto, style='Sub.TLabel').pack(anchor='w', pady=(12, 22))
-        ttk.Label(main, textvariable=self.resumo_dia_texto, style='Sub.TLabel', wraplength=950).pack(anchor='w', pady=(0, 14))
-        ttk.Label(main, textvariable=self.nuvem_status, style='Sub.TLabel', wraplength=950).pack(anchor='w', pady=(0, 10))
-        ttk.Button(main, text='Histórico de transações do dia  ↗', command=self.abrir_resultados).pack(anchor='w', pady=(0, 14))
-        heading = tk.Frame(main, bg=self.bg)
+        ttk.Label(resumo_parent, textvariable=self.saldo_texto, style='Sub.TLabel', wraplength=360).pack(anchor='w', pady=(12, 22))
+        ttk.Label(resumo_parent, textvariable=self.resumo_dia_texto, style='Sub.TLabel', wraplength=360).pack(anchor='w', pady=(0, 14))
+        ttk.Label(resumo_parent, textvariable=self.nuvem_status, style='Sub.TLabel', wraplength=360).pack(anchor='w', pady=(0, 10))
+        ttk.Button(resumo_parent, text='Histórico de transações do dia  ↗', command=self.abrir_resultados).pack(anchor='w', pady=(0, 14))
+        ttk.Button(resumo_parent, text='Abrir atividade ao vivo  →', command=lambda: self.navigate('atividade')).pack(anchor='w', pady=(0, 18))
+        connection = tk.Frame(login_parent, bg=self.bg)
+        connection.pack(fill='x', pady=(0, 12))
+        activity = self.pages['atividade']
+        ttk.Label(activity, text='Sinais, entradas e resultados desta sessão aparecem aqui.', style='Sub.TLabel').pack(anchor='w', pady=(0, 12))
+        heading = tk.Frame(activity, bg=self.bg)
         heading.pack(fill='x', pady=(0, 12))
         tk.Label(heading, text='Mercados acompanhados', bg=self.bg, fg='#e7e9ef', font=('Segoe UI Variable Text', 14, 'bold')).pack(side='left')
         self.mercados_texto = tk.StringVar()
         tk.Label(heading, textvariable=self.mercados_texto, bg=self.bg, fg=self.muted, font=('Segoe UI Variable Text', 10)).pack(side='right')
-        self.ativos = ttk.Treeview(main, columns=('ativo', 'mercado', 'etapa'), show='headings', height=5)
+        mercados_area = ttk.Frame(activity)
+        mercados_area.pack(fill='x', pady=(0, 16))
+        self.ativos = ttk.Treeview(mercados_area, columns=('ativo', 'mercado', 'etapa'), show='headings', height=3)
         for col, title, width in [('ativo', 'Ativo', 145), ('mercado', 'Disponibilidade', 150), ('etapa', 'Etapa atual', 600)]:
             self.ativos.heading(col, text=title)
             self.ativos.column(col, width=width, minwidth=85, stretch=col == 'etapa')
         for ativo in PARES_DISPONIVEIS:
             self.ativos.insert('', 'end', iid=ativo, values=(ativo, 'Aguardando', 'Inicie a sessão para acompanhar'))
-        self.ativos.pack(fill='x')
-        rodape = tk.Frame(main, bg=self.surface, padx=18, pady=16)
-        rodape.pack(fill='x', pady=(20, 0))
-        self.label(rodape, 'Como a entrada acontece', size=11)
-        self.label(rodape, '01  Bolinha    →    02  Seta em tempo real    →    03  Recuo na mesma vela da seta    →    04  Entrada até 29s', size=9, color='#a1a6b4')
-        ttk.Button(main, text='Ver atividade da sessão  →', command=lambda: self.navigate('atividade')).pack(anchor='w', pady=16)
-        # Activity has its own full-height page, with the selected event below.
-        activity = self.pages['atividade']
+        self.ativos.pack(side='left', fill='x', expand=True)
+        mercados_scroll = ttk.Scrollbar(mercados_area, command=self.ativos.yview)
+        mercados_scroll.pack(side='right', fill='y')
+        self.ativos.configure(yscrollcommand=mercados_scroll.set)
         ttk.Label(activity, textvariable=self.contagem, font=('Segoe UI Variable Text', 13, 'bold')).pack(anchor='w', pady=(0, 8))
         ttk.Label(activity, textvariable=self.resultado_texto, style='Sub.TLabel').pack(anchor='w', pady=(0, 18))
         area = ttk.Frame(activity)
@@ -242,41 +264,44 @@ class Painel:
         scroll = ttk.Scrollbar(area, command=self.historico.yview)
         scroll.pack(side='right', fill='y')
         self.historico.configure(yscrollcommand=scroll.set)
-        ttk.Label(activity, text='Registro original · selecione um evento acima', style='Sub.TLabel').pack(anchor='w', pady=(18, 8))
-        self.detalhe = tk.Text(activity, height=4, bg=self.surface, fg='#b4bac9', font=('Cascadia Code', 10), relief='flat', padx=14, pady=12, wrap='word', state='disabled')
+        ttk.Label(activity, text='Detalhes do evento ao vivo · selecione uma linha acima', style='Sub.TLabel').pack(anchor='w', pady=(18, 8))
+        self.detalhe = tk.Text(activity, height=3, bg=self.surface, fg='#b4bac9', font=('Cascadia Code', 10), relief='flat', padx=14, pady=12, wrap='word', state='disabled')
         self.detalhe.pack(fill='x')
         self.historico.bind('<<TreeviewSelect>>', self.selecionar)
-        # Dedicated connection page keeps forms out of the dashboard.
-        connection = self.pages['conexao']
+        # Login e estratégia ficam no Início, abaixo dos dados da conta.
         form = ttk.Frame(connection, padding=(0, 0, 24, 0))
-        form.pack(side='left', fill='y')
-        form.configure(width=430)
-        form.pack_propagate(False)
-        ttk.Label(form, text='Conecte sua conta demo', font=('Segoe UI Variable Display', 20)).pack(anchor='w', pady=(0, 8))
+        form.pack(side='left', fill='both', expand=True)
+        form.configure(width=350)
+        ttk.Label(form, text='Conectar conta DEMO', font=('Segoe UI Variable Display', 20)).pack(anchor='w', pady=(0, 8))
         ttk.Label(form, text='Escolha o modo antes de iniciar a sessão.', style='Sub.TLabel').pack(anchor='w', pady=(0, 20))
         self.opcoes_modo = []
         for texto, val in [('Só observar · sem enviar ordens', 'simulacao'), ('DEMO automática · saldo virtual', 'demo')]:
             radio = ttk.Radiobutton(form, text=texto, variable=self.modo, value=val)
             radio.pack(anchor='w', pady=3)
             self.opcoes_modo.append(radio)
-        ttk.Label(form, text='E-mail da IQ Option', style='Sub.TLabel').pack(anchor='w', pady=(22, 8))
+        ttk.Label(form, text='E-mail da IQ Option', style='Sub.TLabel').pack(anchor='w', pady=(14, 6))
         self.email = ttk.Entry(form)
         self.email.pack(fill='x')
-        ttk.Label(form, text='Senha', style='Sub.TLabel').pack(anchor='w', pady=(16, 8))
+        ttk.Label(form, text='Senha', style='Sub.TLabel').pack(anchor='w', pady=(12, 6))
         self.senha = ttk.Entry(form, show='•')
         self.senha.pack(fill='x')
-        self.iniciar = ttk.Button(form, text='Iniciar sessão  →', command=self.start, style='Start.TButton')
-        self.iniciar.pack(fill='x', pady=(24, 10))
+        self.iniciar = ttk.Button(form, text='Conectar e iniciar sessão  →', command=self.start, style='Start.TButton')
+        self.iniciar.pack(fill='x', pady=(16, 8))
         self.parar = ttk.Button(form, text='Encerrar sessão', command=self.stop, style='Stop.TButton', state='disabled')
         self.parar.pack(fill='x')
         ttk.Label(form, text='A senha não é salva pelo painel.', style='Sub.TLabel').pack(anchor='w', pady=15)
-        config = tk.Frame(connection, bg=self.surface, padx=28, pady=24)
-        config.pack(side='left', fill='x', expand=True, anchor='n', padx=(24, 0))
+        config = tk.Frame(main, bg=self.surface, padx=20, pady=20)
+        config.pack(fill='x', pady=(16, 12))
         self.label(config, 'Estratégia configurada', size=15, display=True)
         self.campos_config = []
-        for title, variavel in [('Recuo desde a abertura (pips)', self.config_pips), ('Valor por entrada (moeda da conta)', self.config_valor), ('Expiração (minutos)', self.config_expiracao)]:
-            self.label(config, title, size=9, color='#9098ab', pady=(12, 3))
-            campo = ttk.Combobox(config, textvariable=variavel, values=('1', '2', '3', '4', '5'), state='readonly', width=20) if variavel is self.config_expiracao else ttk.Entry(config, textvariable=variavel, width=22)
+        parametros_linha = tk.Frame(config, bg=self.surface)
+        parametros_linha.pack(fill='x')
+        for indice, (title, variavel) in enumerate([('Recuo desde a abertura (pips)', self.config_pips), ('Valor por entrada (moeda da conta)', self.config_valor), ('Expiração (minutos)', self.config_expiracao)]):
+            parametros_linha.columnconfigure(indice, weight=1, uniform='parametros')
+            campo_base = tk.Frame(parametros_linha, bg=self.surface)
+            campo_base.grid(row=0, column=indice, sticky='ew', padx=(0 if indice == 0 else 16, 0))
+            self.label(campo_base, title, size=9, color='#9098ab', pady=(12, 3))
+            campo = ttk.Combobox(campo_base, textvariable=variavel, values=('1', '2', '3', '4', '5'), state='readonly', width=20) if variavel is self.config_expiracao else ttk.Entry(campo_base, textvariable=variavel, width=22)
             campo.pack(fill='x')
             self.campos_config.append(campo)
         self.salvar_config = ttk.Button(config, text='Salvar parâmetros', command=self.salvar_parametros)
@@ -290,30 +315,25 @@ class Painel:
             self.label(config, value, size=11)
         help_page = self.pages['ajuda']
         ttk.Label(help_page, text='Entenda o que o robô faz', font=('Segoe UI Variable Display', 22)).pack(anchor='w', pady=(0, 20))
-        for title, text in [('Só observar', 'Acompanha os preços e registra sinais. Não envia ordens e não calcula resultados hipotéticos.'), ('DEMO automática', 'Abre operações sozinho usando saldo virtual. CALL é previsão de alta; PUT é previsão de queda.'), ('A regra da entrada', 'Após a bolinha fechada, observa a seta em tempo real e espera o recuo escolhido em Conexão, desde a abertura dessa mesma vela da seta. A seta pode desaparecer enquanto a vela está aberta; sua detecção fica registrada, mas um sinal contrário cancela a oportunidade. Na compra, abaixo; na venda, acima. Sinais continuam em velas de 1 minuto; a expiração pode ser de 1 a 5 minutos. Só envia até o segundo 29.'), ('Saldo e resultados', 'Saldo consultado a cada 3 segundos, mais o tempo de resposta da API, e após resultados. Ganhos e perdas somam todas as sessões do dia local. A taxa é ganhos divididos pelas operações concluídas, incluindo empates; pendentes ficam fora. Não há garantia de assertividade.'), ('Ao encerrar', 'Novas entradas param. Ordens já abertas continuam na corretora e devem ser conferidas na IQ Option.')]:
+        for title, text in [('Só observar', 'Acompanha os preços e registra sinais. Não envia ordens e não calcula resultados hipotéticos.'), ('DEMO automática', 'Abre operações sozinho usando saldo virtual. CALL é previsão de alta; PUT é previsão de queda.'), ('A regra da entrada', 'Após a bolinha fechada, observa a seta em tempo real e espera o recuo escolhido no Início, desde a abertura dessa mesma vela da seta. A seta pode desaparecer enquanto a vela está aberta; sua detecção fica registrada, mas um sinal contrário cancela a oportunidade. Na compra, abaixo; na venda, acima. Sinais continuam em velas de 1 minuto; a expiração pode ser de 1 a 5 minutos. Só envia até o segundo 29.'), ('Saldo e resultados', 'Saldo consultado a cada 3 segundos, mais o tempo de resposta da API, e após resultados. Ganhos e perdas somam todas as sessões do dia local. A taxa é ganhos divididos pelas operações concluídas, incluindo empates; pendentes ficam fora. Não há garantia de assertividade.'), ('Ao encerrar', 'Novas entradas param. Ordens já abertas continuam na corretora e devem ser conferidas na IQ Option.')]:
             ttk.Label(help_page, text=title, font=('Segoe UI Variable Text', 12, 'bold')).pack(anchor='w', pady=(12, 5))
             ttk.Label(help_page, text=text, style='Sub.TLabel', wraplength=850).pack(anchor='w')
-        # Sidebar overlays content while expanded, avoiding jumping tables.
-        self.sidebar = tk.Frame(root, bg='#202229', width=72)
-        self.sidebar.place(x=0, y=0, width=72, relheight=1)
-        self.sidebar_width = 72
-        self.sidebar_target = 72
-        self.sidebar_anim = None
+        # Navegação fixa deixa as abas nomeadas sempre visíveis.
+        self.sidebar = tk.Frame(root, bg='#202229', width=216)
+        self.sidebar.place(x=0, y=0, width=216, relheight=1)
         self.nav_items = []
-        self.logo = tk.Label(self.sidebar, text='IQ', bg='#202229', fg='#f58220', font=('Segoe UI Variable Display', 18, 'bold'), anchor='w')
-        self.logo.place(x=21, y=24, width=195, height=48)
-        for index, (icon, title, key) in enumerate([('◫', 'Visão geral', 'resumo'), ('≡', 'Atividade', 'atividade'), ('↔', 'Conexão', 'conexao'), ('?', 'Como funciona', 'ajuda')]):
-            button = tk.Button(self.sidebar, text=icon, anchor='w', padx=16, bg='#202229', fg='#989dab', activebackground='#383b44', activeforeground='#f58220', bd=0, relief='flat', font=('Segoe UI Variable Text', 15), cursor='hand2', command=lambda k=key: self.navigate(k))
-            button.place(x=10, y=110+index*64, width=52, height=48)
+        self.logo = tk.Label(self.sidebar, text='IQ  Painel', bg='#202229', fg='#f58220', font=('Segoe UI Variable Display', 18, 'bold'), anchor='w')
+        self.logo.place(x=22, y=24, width=190, height=48)
+        for index, (icon, title, key) in enumerate([('⌂', 'Início', 'inicio'), ('≡', 'Atividade ao vivo', 'atividade'), ('?', 'Como funciona', 'ajuda')]):
+            button = tk.Button(self.sidebar, text=f'{icon}   {title}', anchor='w', padx=14, bg='#202229', fg='#989dab', activebackground='#383b44', activeforeground='#f58220', bd=0, relief='flat', font=('Segoe UI Variable Text', 11), cursor='hand2', command=lambda k=key: self.navigate(k))
+            button.place(x=10, y=110+index*64, width=196, height=48)
             self.nav_items.append((button, icon, title, key))
-        self.nav_footer = tk.Label(self.sidebar, text='D', anchor='w', bg='#202229', fg='#767d8d', font=('Segoe UI Variable Text', 10))
-        self.nav_footer.place(x=28, rely=1, y=-55, width=180, height=30)
+        self.nav_footer = tk.Label(self.sidebar, text='●  Ambiente demo', anchor='w', bg='#202229', fg='#767d8d', font=('Segoe UI Variable Text', 10))
+        self.nav_footer.place(x=24, rely=1, y=-55, width=180, height=30)
         self.current_page = None
         self.atualizar_pares_selecionados()
-        self.navigate('resumo')
+        self.navigate('inicio')
         self.sidebar.lift()
-        root.after(80, self.sidebar_hover)
-        self.carregar_historico()
         self.sincronizar_resumo_diario()
         root.after(150, self.poll)
         root.protocol('WM_DELETE_WINDOW', self.close)
@@ -324,38 +344,12 @@ class Painel:
         return widget
 
     def navigate(self, key):
+        key = {'resumo': 'inicio', 'conexao': 'inicio'}.get(key, key)
         self.pages[key].tkraise()
         self.current_page = key
-        self.page_title.set({'resumo': 'Visão geral', 'atividade': 'Atividade da sessão', 'conexao': 'Conexão', 'ajuda': 'Como funciona'}[key])
+        self.page_title.set({'inicio': 'Início', 'atividade': 'Atividade ao vivo', 'ajuda': 'Como funciona'}[key])
         for button, icon, title, item_key in self.nav_items:
             button.configure(bg='#3d2e23' if key == item_key else '#202229', fg='#ffab66' if key == item_key else '#989dab')
-
-    def sidebar_hover(self):
-        x, y = self.root.winfo_pointerxy()
-        inside = (self.sidebar.winfo_rootx() <= x < self.sidebar.winfo_rootx()+self.sidebar_width and self.sidebar.winfo_rooty() <= y < self.sidebar.winfo_rooty()+self.sidebar.winfo_height())
-        target = 224 if inside else 72
-        if target != self.sidebar_target:
-            self.sidebar_target = target
-            if self.sidebar_anim is None:
-                self.animate_sidebar()
-        self.root.after(80, self.sidebar_hover)
-
-    def animate_sidebar(self):
-        delta = self.sidebar_target - self.sidebar_width
-        if abs(delta) <= 3:
-            self.sidebar_width = self.sidebar_target
-            self.sidebar_anim = None
-        else:
-            self.sidebar_width += int(delta * 0.25) or (1 if delta > 0 else -1)
-            self.sidebar_anim = self.root.after(16, self.animate_sidebar)
-        expanded = self.sidebar_width > 140
-        self.sidebar.place_configure(width=self.sidebar_width)
-        self.content.pack_configure(padx=(self.sidebar_width+24, 30))
-        self.logo.configure(text='IQ  Painel' if expanded else 'IQ')
-        for button, icon, title, key in self.nav_items:
-            button.configure(text=f'{icon}    {title}' if expanded else icon, font=('Segoe UI Variable Text', 11 if expanded else 15))
-            button.place_configure(width=self.sidebar_width-20)
-        self.nav_footer.configure(text='●  Ambiente demo' if expanded else 'D')
 
     def parametros_digitados(self):
         return validar_configuracao({'pips': self.config_pips.get(), 'valor': self.config_valor.get(), 'expiracao': self.config_expiracao.get(),
@@ -486,7 +480,7 @@ class Painel:
             for ativo in parametros['pares']:
                 self.ativos.item(ativo, values=(ativo, 'Aguardando', 'Conectando à corretora'))
             self.status.set('Conectando • Aguarde a confirmação da conta demo.')
-            self.navigate('resumo')
+            self.navigate('inicio')
             threading.Thread(target=self.reader, args=(self.processo,), daemon=True).start()
         except Exception as exc:
             self.stop()
@@ -668,26 +662,6 @@ class Painel:
         if foco is not None and foco.winfo_exists():
             foco.focus_set()
 
-    def carregar_historico(self):
-        if self.conta_historico is None:
-            return
-        try:
-            from collections import deque
-            linhas = deque(self.conta_historico.ler('evento'), maxlen=300)
-            self.historico.delete(*self.historico.get_children())
-            self.registros.clear()
-            for linha in linhas:
-                evento = linha.get('EVENTO', '')
-                detalhe = linha.get('DETALHE', '')
-                texto = EXPLICACOES.get(evento, evento.replace('_', ' ').capitalize())
-                if evento == 'DISPONIBILIDADE':
-                    texto = 'Mercado: ' + {'ABERTO': 'aberto', 'FECHADO': 'fechado', 'NAO_CONFIRMADA': 'abertura não confirmada'}.get(detalhe, detalhe)
-                self.evento(linha.get('DATA_HORA', ''), linha.get('ATIVO', ''), texto,
-                            'Registro salvo de sessão anterior | ' + evento + ' | ' + detalhe)
-            self.contagem.set('Histórico salvo carregado · novas atividades aparecem abaixo')
-        except (OSError, csv.Error, UnicodeError):
-            self.evento('', 'SISTEMA', 'Não foi possível carregar o histórico salvo.', 'Confira o arquivo de eventos na pasta do bot.')
-
     def evento(self, hora, ativo, texto, original):
         tag = 'ganho' if 'RESULTADO_WIN' in original else 'perda' if 'RESULTADO_LOSS' in original else 'aviso' if any(x in original for x in ['ERRO', 'BLOQUEADO', 'NAO_CONFIRMADO', 'RECUSADA']) else 'sinal' if any(x in original for x in ['DEMO_ENVIADA', 'SINAL_SIMULADO', 'SETA_CONFIRMADA', 'SETA_DETECTADA']) else ''
         item = self.historico.insert('', 'end', values=(hora, ativo, texto), tags=(tag,))
@@ -710,7 +684,6 @@ class Painel:
                     if linha[1] is self.sincronizador_nuvem:
                         self.nuvem_status.set(linha[2])
                         self.atualizar_resumo_diario()
-                        self.carregar_historico()
                         janela = getattr(self, 'janela_resultados', None)
                         if janela is not None and janela.winfo_exists():
                             self.preencher_resultados()
@@ -738,6 +711,7 @@ class Painel:
                         self.saldo_texto.set('Sessão encerrada · conecte para consultar o saldo atual.')
                     continue
                 if 'Conta confirmada: PRACTICE' in linha:
+                    self.navigate('atividade')
                     self.status.set('Conectado • DEMO AUTOMÁTICA ATIVA: operações com saldo virtual.' if self.modo_sessao == 'demo' else 'Conectado à conta demo • Simulação ativa, sem envio de ordens.')
                     self.evento('', 'SISTEMA', 'Conexão confirmada na conta de demonstração.', linha)
                 elif linha.startswith('[') and ' | ' in linha:
@@ -847,7 +821,6 @@ class Painel:
                 lambda texto: self.fila.put(('nuvem', sincronizador, texto)))
             self.sincronizador_nuvem = sincronizador
             self.nuvem_status.set('Buscando histórico desta conta no Supabase…')
-            self.carregar_historico()
             self.atualizar_resumo_diario()
             threading.Thread(target=sincronizador.executar, daemon=True).start()
         elif tipo == 'historico_erro':
