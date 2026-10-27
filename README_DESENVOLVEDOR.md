@@ -1,4 +1,4 @@
-# Código-fonte do Bot Marcos — Windows 1.0.12
+# Código-fonte do Bot Marcos — Windows 1.0.13
 
 Esta pasta é o projeto original editável. O executável é gerado a partir
 destes arquivos; alterar o código não modifica um EXE que já foi gerado.
@@ -60,7 +60,7 @@ Uma versão Windows deve ser gerada no Windows; este build não gera `.app`.
 ## O que o comando entrega
 
 - `dist-windows\BotMarcos.exe`: aplicativo final para o cliente, com o motor e o Python incluídos.
-- `dist-windows\BOT_MARCOS_WINDOWS_1.0.12.zip`: pacote com o EXE e `LEIA-ME.txt`.
+- `dist-windows\BOT_MARCOS_WINDOWS_1.0.13.zip`: pacote com o EXE e `LEIA-ME.txt`.
 - `dist-motor\MotorMarcos.exe`: componente interno; não é o arquivo para o cliente abrir.
 - `build-*`: arquivos intermediários; não precisam ser enviados ao cliente.
 
@@ -233,7 +233,7 @@ A lista depende do retorno da conta/regiao e pode diferir dos destaques e
 rankings da interface web. Nao inventa percentuais, tendencias ou mercados
 que a API nao retornou. Nao habilita negociacao em Blitz/Digital/Margem.
 
-## Selecao de Binarias durante a conexao (1.0.12)
+## Selecao de Binarias durante a conexao (1.0.13)
 
 `pares_ao_vivo.py` consulta a lista de Binarias/Turbo a cada 10 segundos
 mais tempo de resposta. Blitz/Digital nao entram no seletor. A lista perde
@@ -258,6 +258,10 @@ a sintaxe e tamanho; a disponibilidade e identidade sao verificadas na
 sessao. Busca, OTC, so disponiveis, selecionados e marcar visiveis nao
 alteram valor, recuo, modo de operacao nem expiracao.
 
-## Correcao do recebimento WebSocket (1.0.12)
+## Correcao do recebimento WebSocket (1.0.13)
 
 O interceptador do catalogo preserva um metodo ligado, conforme o dispatcher do websocket-client instalado. Uma funcao simples recebia um argumento extra e impedia o SDK de processar mensagens normais da conexao. O teste usa WebSocketApp._callback real para verificar tanto mensagens normais quanto respostas correlacionadas do catalogo, sem login ou ordens.
+
+## Respostas de confirmacao do catalogo (1.0.13)
+
+O SDK ativa setOptions(sendResults=True). O coletor agora ignora result/success=True e aguarda a lista correlacionada ao mesmo request_id. Recusas encerram a consulta com ConsultaRecusada, sem divulgar a resposta. Uma confirmacao tardia nao sobrescreve a lista. Testes cobrem ACK antes/depois, ACK sem lista, recusa e limpeza das consultas pendentes. Validacao autenticada depende da sessao do usuario.

@@ -16,6 +16,14 @@ FONTES = (
 )
 
 
+class ConsultaRecusada(RuntimeError):
+    """Recusa da consulta, sem divulgar o corpo retornado pela corretora."""
+
+
+class RespostaCatalogoInvalida(ValueError):
+    pass
+
+
 class ConsultaCatalogo:
     """Correlacao isolada: respostas v4 nao sobrescrevem a consulta v3 do motor."""
     def __init__(self, api):
@@ -35,7 +43,16 @@ class ConsultaCatalogo:
             return False
         with self.lock:
             pendente = self.pendentes.get(chave)
-            if pendente is not None:
+            if pendente is not None and not pendente['evento'].is_set():
+                # setOptions(sendResults=True) produz um ACK separado da lista.
+                # O ACK positivo não conclui a consulta nem substitui seus dados.
+                if mensagem.get('name') == 'result':
+                    resultado = mensagem.get('msg')
+                    if isinstance(resultado, dict) and resultado.get('success') is True:
+                        return True
+                    pendente['erro'] = ConsultaRecusada()
+                    pendente['evento'].set()
+                    return True
                 pendente['resposta'] = mensagem.get('msg')
                 pendente['evento'].set()
         return True  # inclusive respostas atrasadas, sem interferir no motor
@@ -52,9 +69,11 @@ class ConsultaCatalogo:
                 {'name': nome, 'version': versao, 'body': corpo}, request_id=chave)
             if not pendente['evento'].wait(timeout):
                 raise TimeoutError('Sem resposta do catalogo')
+            if 'erro' in pendente:
+                raise pendente['erro']
             resultado = pendente.get('resposta')
             if not isinstance(resultado, dict):
-                raise ValueError('Resposta de catalogo invalida')
+                raise RespostaCatalogoInvalida()
             return resultado
         finally:
             with self.lock:

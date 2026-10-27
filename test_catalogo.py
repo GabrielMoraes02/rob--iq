@@ -3,7 +3,7 @@ import threading
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock
-from catalogo import ConsultaCatalogo, instalar_consulta, normalizar_catalogo, filtrar, acompanhar_catalogo
+from catalogo import ConsultaCatalogo, ConsultaRecusada, instalar_consulta, normalizar_catalogo, filtrar, acompanhar_catalogo
 
 
 def resposta_opcoes():
@@ -15,6 +15,35 @@ def resposta_opcoes():
 
 
 class Catalogo(unittest.TestCase):
+    def test_ack_positivo_nao_substitui_lista_em_nenhuma_ordem(self):
+        for ack_primeiro in (True, False):
+            with self.subTest(ack_primeiro=ack_primeiro):
+                api = Mock()
+                consulta = ConsultaCatalogo(api)
+                def enviar(nome, msg, request_id):
+                    ack = {'name': 'result', 'request_id': request_id, 'msg': {'success': True}}
+                    lista = {'name': 'initialization-data', 'request_id': request_id, 'msg': resposta_opcoes()}
+                    if ack_primeiro:
+                        consulta.receber(json.dumps(ack))
+                        self.assertFalse(consulta.pendentes[request_id]['evento'].is_set())
+                    consulta.receber(json.dumps(lista))
+                    consulta.receber(json.dumps(ack))
+                api.send_websocket_request.side_effect = enviar
+                self.assertEqual(consulta.consultar('get-initialization-data', '4.0', {}, timeout=.1), resposta_opcoes())
+
+    def test_ack_sem_lista_expira_e_recusa_nao_expoe_resposta(self):
+        for sucesso in (True, False):
+            api = Mock()
+            consulta = ConsultaCatalogo(api)
+            def enviar(nome, msg, request_id):
+                consulta.receber(json.dumps({'name': 'result', 'request_id': request_id,
+                    'msg': {'success': sucesso, 'message': 'segredo-nao-publicar'}}))
+            api.send_websocket_request.side_effect = enviar
+            with self.assertRaises(TimeoutError if sucesso else ConsultaRecusada) as contexto:
+                consulta.consultar('get-initialization-data', '4.0', {}, timeout=.01)
+            self.assertNotIn('segredo', str(contexto.exception))
+            self.assertEqual(consulta.pendentes, {})
+
     def test_dispatcher_real_preserva_mensagens_da_conexao(self):
         from websocket import WebSocketApp
         recebidas = []
