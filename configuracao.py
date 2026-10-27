@@ -7,6 +7,17 @@ from pathlib import Path
 PARES_OTC = ['EURUSD-OTC', 'GBPUSD-OTC', 'USDJPY-OTC', 'EURJPY-OTC', 'GBPJPY-OTC']
 PARES_DISPONIVEIS = PARES_OTC + [par.removesuffix('-OTC') for par in PARES_OTC]
 PADRAO = {'pips': 3.0, 'valor': 20.0, 'expiracao': 1, 'pares': PARES_OTC.copy()}
+OPCOES_EXPIRACAO = {'30 segundos': 0.5, '1 minuto': 1, '2 minutos': 2,
+                    '3 minutos': 3, '4 minutos': 4, '5 minutos': 5}
+
+
+def formatar_expiracao(valor):
+    try:
+        numero = Decimal(str(valor).strip().replace(',', '.'))
+    except InvalidOperation:
+        return str(valor)
+    return next((rotulo for rotulo, minutos in OPCOES_EXPIRACAO.items()
+                 if numero == Decimal(str(minutos))), str(valor))
 
 
 def validar_configuracao(dados):
@@ -14,7 +25,10 @@ def validar_configuracao(dados):
         raise ValueError('Configuração inválida: revise os parâmetros.')
     def numero(chave, titulo):
         try:
-            valor = Decimal(str(dados.get(chave, PADRAO[chave])).strip().replace(',', '.'))
+            entrada = dados.get(chave, PADRAO[chave])
+            if chave == 'expiracao':
+                entrada = OPCOES_EXPIRACAO.get(str(entrada).strip(), entrada)
+            valor = Decimal(str(entrada).strip().replace(',', '.'))
         except InvalidOperation:
             raise ValueError(f'{titulo}: digite um número válido.') from None
         if not valor.is_finite():
@@ -27,12 +41,12 @@ def validar_configuracao(dados):
         raise ValueError('O recuo deve ser maior que zero e de até 1.000 pips.')
     if not 1 <= valor <= 1000000 or valor != valor.quantize(Decimal('0.01')):
         raise ValueError('O valor deve ser de 1 a 1.000.000, com até duas casas decimais. A corretora ainda pode recusar pelo limite da conta.')
-    if expiracao != expiracao.to_integral_value() or not 1 <= expiracao <= 5:
-        raise ValueError('Escolha uma expiração inteira de 1 a 5 minutos (binária/turbo).')
+    if expiracao not in {Decimal(str(v)) for v in OPCOES_EXPIRACAO.values()}:
+        raise ValueError('Escolha 30 segundos ou de 1 a 5 minutos (binária/turbo).')
     pares = dados.get('pares', PARES_OTC)
     if not isinstance(pares, list) or not pares or any(not isinstance(par, str) or par not in PARES_DISPONIVEIS for par in pares):
         raise ValueError('Selecione pelo menos um dos pares disponíveis no painel.')
-    return {'pips': float(pips), 'valor': float(valor), 'expiracao': int(expiracao),
+    return {'pips': float(pips), 'valor': float(valor), 'expiracao': 0.5 if expiracao == Decimal('0.5') else int(expiracao),
             'pares': list(dict.fromkeys(pares))}
 
 

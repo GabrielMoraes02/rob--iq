@@ -1,4 +1,4 @@
-# Código-fonte do Bot Marcos — Windows 1.0.4
+# Código-fonte do Bot Marcos — Windows 1.0.5
 
 Esta pasta é o projeto original editável. O executável é gerado a partir
 destes arquivos; alterar o código não modifica um EXE que já foi gerado.
@@ -60,7 +60,7 @@ Uma versão Windows deve ser gerada no Windows; este build não gera `.app`.
 ## O que o comando entrega
 
 - `dist-windows\BotMarcos.exe`: aplicativo final para o cliente, com o motor e o Python incluídos.
-- `dist-windows\BOT_MARCOS_WINDOWS_1.0.4.zip`: pacote com o EXE e `LEIA-ME.txt`.
+- `dist-windows\BOT_MARCOS_WINDOWS_1.0.5.zip`: pacote com o EXE e `LEIA-ME.txt`.
 - `dist-motor\MotorMarcos.exe`: componente interno; não é o arquivo para o cliente abrir.
 - `build-*`: arquivos intermediários; não precisam ser enviados ao cliente.
 
@@ -143,3 +143,18 @@ Por orientação do responsável pelo projeto, toda alteração concluída deve
 ser salva em um commit próprio e enviada ao repositório GitHub configurado.
 Inclua os testes e a documentação da mudança. Não versione credenciais,
 históricos, ambientes locais ou executáveis gerados.
+
+## Expiração de 30 segundos (1.0.5)
+
+`configuracao.py` aceita 0.5 minuto ou o rótulo `30 segundos`, preservando
+as configurações anteriores de 1 a 5 minutos. A interface exibe as unidades.
+`expiracao_ordem.py` usa `buy_by_raw_expirations` com produto turbo e
+vencimento igual ao segundo inteiro do relógio do servidor mais 30 segundos.
+O método `buy` de minutos continua sendo usado somente para 1–5 minutos.
+Relógio inválido, conta REAL ou adaptador ausente bloqueiam o envio. Uma
+recusa não dispara fallback ou reenvio com outro prazo. O evento
+`EXPIRACAO_SOLICITADA` registra o timestamp que pode ser auditado.
+
+O envio é testado com corretora simulada. A aceitação e o vencimento efetivo
+devem ser validados na DEMO; o prazo não é garantido por um teste local.
+Veja [a referência técnica](referencias/EXPIRACAO_30S.md).

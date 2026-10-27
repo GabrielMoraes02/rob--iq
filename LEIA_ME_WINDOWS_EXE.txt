@@ -1,4 +1,4 @@
-BOT MARCOS - WINDOWS 1.0.4
+BOT MARCOS - WINDOWS 1.0.5
 
 1. Extraia o ZIP inteiro para uma pasta do seu computador.
 2. Abra BotMarcos.exe com dois cliques.
@@ -19,7 +19,7 @@ A senha nao e salva. Ao reabrir o programa, entre novamente na conta.
 Nao precisa instalar Python, Tkinter ou executar arquivos CMD.
 O programa ja inclui as dependencias. A primeira abertura pode levar alguns
 segundos. E necessario acesso a internet para a corretora e o historico.
-Confira 'Windows 1.0.4' no titulo da janela. Feche a versao anterior antes
+Confira 'Windows 1.0.5' no titulo da janela. Feche a versao anterior antes
 de abrir esta; nao execute dois robos na mesma conta ao mesmo tempo.
 
 Quando uma ordem DEMO for aceita, o topo do painel destaca o par, CALL/PUT,
@@ -90,3 +90,12 @@ atual. Depois que a conta e confirmada, esta aba abre automaticamente.
 Voce pode voltar ao Inicio a qualquer momento para conferir saldo e historico.
 Os eventos antigos nao sao misturados com a atividade ao vivo; as transacoes
 salvas continuam disponiveis no historico do Inicio e no Supabase.
+
+EXPIRACAO DE 30 SEGUNDOS
+No Inicio, escolha 30 segundos em Expiracao e salve os parametros.
+O bot solicita vencimento por horario explicito na API Binarias/Turbo;
+nao envia 0,5 ao metodo de minutos e nao arredonda para 1 minuto.
+O prazo depende de aceitacao da corretora para o ativo e horario. Se houver
+recusa, ela aparece na Atividade ao vivo; nao ocorre tentativa com outro prazo.
+Confira o vencimento efetivo nos detalhes da ordem na IQ Option DEMO.
+As velas dos sinais continuam em M1; apenas a expiracao solicitada muda.

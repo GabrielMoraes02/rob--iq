@@ -26,11 +26,14 @@ def autoteste(destino):
         for par, variavel in app.pares_config.items():
             variavel.set(par in selecionados)
         assert set(app.parametros_digitados()['pares']) == set(selecionados)
+        app.config_expiracao.set('30 segundos')
+        assert app.parametros_digitados()['expiracao'] == 0.5
         app.som_ativo.set(False)
-        app.fila.put('[12:00:00] EURUSD-OTC | DEMO_ENVIADA | CALL valor=20.00 expiracao=1 id=autoteste')
+        app.fila.put('[12:00:00] EURUSD-OTC | DEMO_ENVIADA | CALL valor=20.00 expiracao=0.5 id=autoteste')
         app.poll()
         assert 'EURUSD-OTC' in app.entrada_par.get()
         assert 'CALL' in app.entrada_par.get()
+        assert '30 segundos' in app.entrada_info.get()
         app.fila.put('[12:01:00] EURUSD-OTC | RESULTADO_WIN | id=autoteste lucro_liquido=17.40')
         app.poll()
         assert 'CONCLUÍDA' in app.entrada_estado.get()
@@ -47,6 +50,7 @@ def autoteste(destino):
             'tls_inicializado': contexto.verify_mode == ssl.CERT_REQUIRED,
             'titulo': root.title(), 'destaque_de_entrada_testado': True,
             'pares_disponiveis': len(app.pares_config), 'selecao_de_pares_testada': True,
+            'expiracao_30s_testada': True,
             'dados_fora_do_executavel': pasta_dados() != pasta_recursos(),
             'painel_sem_login': True, 'nenhuma_ordem_enviada': True}
         Path(destino).write_text(json.dumps(relatorio, ensure_ascii=False, indent=2), encoding='utf-8')

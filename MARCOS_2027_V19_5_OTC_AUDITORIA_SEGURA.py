@@ -9,6 +9,8 @@ import sys
 import time
 from datetime import datetime
 from getpass import getpass
+from configuracao import formatar_expiracao
+from expiracao_ordem import comprar_com_expiracao
 
 ATIVOS = ['EURUSD-OTC', 'GBPUSD-OTC', 'USDJPY-OTC', 'EURJPY-OTC', 'GBPJPY-OTC']
 VALOR = 20
@@ -273,7 +275,9 @@ def processar(ativo, velas, estado, agora, enviar_ordem, iq, disponibilidade_con
             elif time.time() - t_entrada > LIMITE_SEGUNDO:
                 escrever(ativo, 'FORA_DA_JANELA', '29 segundos excedidos antes de enviar')
             else:
-                ok, id_ordem = iq.buy(VALOR, ativo, a['lado'].lower(), EXPIRACAO)
+                ok, id_ordem = comprar_com_expiracao(iq, VALOR, ativo, a['lado'].lower(), EXPIRACAO,
+                    registrar=lambda vencimento: escrever(ativo, 'EXPIRACAO_SOLICITADA',
+                        f'duracao_segundos=30 vencimento_ts={vencimento} produto=turbo sem_fallback=1'))
                 escrever(ativo, 'DEMO_ENVIADA' if ok else 'ORDEM_RECUSADA',
                          f'{detalhe} id={id_ordem}')
                 if ok and id_ordem:
@@ -290,7 +294,7 @@ def main():
     print('\nMARCOS 2027 - V19 GENERAL 3 PIPS | PROTOTIPO PARA VALIDACAO')
     print('Bolinha e seta CALCULADAS pelas velas (NAO sao leitura do indicador visual).')
     print(f'Seta intrabar; recuo de {CORRECAO_PIPS:g} pips na mesma vela da seta; ate 29s.')
-    print(f'M1, {len(ATIVOS)} pares selecionados, expiracao {EXPIRACAO} minuto(s), valor {VALOR:.2f} na moeda da conta, sem MG.')
+    print(f'M1, {len(ATIVOS)} pares selecionados, expiracao {formatar_expiracao(EXPIRACAO)}, valor {VALOR:.2f} na moeda da conta, sem MG.')
     escrever('GERAL', 'CONFIGURACAO', f'pips={CORRECAO_PIPS:g} valor={VALOR:.2f} expiracao={EXPIRACAO} pares={",".join(ATIVOS)} modo=mesma_vela_seta')
     print('NAO executar V16 ao mesmo tempo. CTRL+C para sair.\n')
     print('1 = SIMULACAO (PADRAO; SEM ORDENS)')

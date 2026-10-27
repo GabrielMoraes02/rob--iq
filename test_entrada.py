@@ -86,6 +86,13 @@ class Entrada(unittest.TestCase):
             self.assertEqual(self.executar('CALL', 1.1-4.5*bot.pip('EURUSD-OTC'))[0], [(12.75, 'EURUSD-OTC', 'call', 5)])
             self.assertEqual(self.executar('PUT', 1.1+4.5*bot.pip('EURUSD-OTC'))[0], [(12.75, 'EURUSD-OTC', 'put', 5)])
 
+    def test_30_segundos_chega_ao_adaptador_sem_truncamento(self):
+        from unittest.mock import Mock
+        envio = Mock(return_value=(False, None))
+        with patch.object(bot, 'EXPIRACAO', 0.5), patch.object(bot, 'comprar_com_expiracao', envio):
+            self.executar('CALL', 1.0996)
+        self.assertEqual(envio.call_args.args[1:], (20, 'EURUSD-OTC', 'call', 0.5))
+
     def cenario_intrabar(self, lado):
         t=1800000000
         velas=[{'t': t-i*60, 'o': 1.1, 'c': 1.1, 'h': 1.101, 'l': 1.099} for i in range(18,3,-1)]

@@ -13,7 +13,7 @@ import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk, messagebox
-from configuracao import PADRAO, PARES_DISPONIVEIS, carregar_configuracao, salvar_configuracao, validar_configuracao
+from configuracao import PADRAO, PARES_DISPONIVEIS, OPCOES_EXPIRACAO, formatar_expiracao, carregar_configuracao, salvar_configuracao, validar_configuracao
 from historico_nuvem import Historico, Sincronizador
 from caminhos import pasta_dados, comando_motor, VERSAO
 
@@ -32,6 +32,7 @@ EXPLICACOES = {
     'CORRECAO_3_PIPS': 'O último preço recebido atingiu a correção de 3 pips dentro da janela.',
     'CORRECAO_PIPS': 'O último preço recebido atingiu o recuo configurado dentro da janela.',
     'CONFIGURACAO': 'Parâmetros utilizados nesta sessão.',
+    'EXPIRACAO_SOLICITADA': 'Preparado vencimento de 30 segundos para a API turbo. Veja o horário solicitado nos detalhes.',
     'SINAL_SIMULADO': 'Entrada simulada registrada. Nenhuma ordem foi enviada.',
     'CANCELADO_POR_CONTRARIO': 'Apareceu um sinal contrário. A oportunidade foi cancelada.',
     'DESCARTADO': 'A oportunidade não cumpriu as condições ou passou do horário.',
@@ -102,7 +103,7 @@ class Painel:
             self.erro_configuracao = 'Configuração salva inválida. Revise e salve os parâmetros antes de iniciar.'
         self.config_pips = tk.StringVar(value=str(configuracao['pips']).replace('.', ','))
         self.config_valor = tk.StringVar(value=str(configuracao['valor']).replace('.', ','))
-        self.config_expiracao = tk.StringVar(value=str(configuracao['expiracao']))
+        self.config_expiracao = tk.StringVar(value=formatar_expiracao(configuracao['expiracao']))
         self.pares_config = {par: tk.BooleanVar(value=par in configuracao['pares']) for par in PARES_DISPONIVEIS}
         self.pares_texto = tk.StringVar(value=f"Escolher pares · {len(configuracao['pares'])} selecionados")
         self.config_status = tk.StringVar(value=self.erro_configuracao or 'Parâmetros aplicados ao iniciar a próxima sessão.')
@@ -296,12 +297,12 @@ class Painel:
         self.campos_config = []
         parametros_linha = tk.Frame(config, bg=self.surface)
         parametros_linha.pack(fill='x')
-        for indice, (title, variavel) in enumerate([('Recuo desde a abertura (pips)', self.config_pips), ('Valor por entrada (moeda da conta)', self.config_valor), ('Expiração (minutos)', self.config_expiracao)]):
+        for indice, (title, variavel) in enumerate([('Recuo desde a abertura (pips)', self.config_pips), ('Valor por entrada (moeda da conta)', self.config_valor), ('Expiração', self.config_expiracao)]):
             parametros_linha.columnconfigure(indice, weight=1, uniform='parametros')
             campo_base = tk.Frame(parametros_linha, bg=self.surface)
             campo_base.grid(row=0, column=indice, sticky='ew', padx=(0 if indice == 0 else 16, 0))
             self.label(campo_base, title, size=9, color='#9098ab', pady=(12, 3))
-            campo = ttk.Combobox(campo_base, textvariable=variavel, values=('1', '2', '3', '4', '5'), state='readonly', width=20) if variavel is self.config_expiracao else ttk.Entry(campo_base, textvariable=variavel, width=22)
+            campo = ttk.Combobox(campo_base, textvariable=variavel, values=tuple(OPCOES_EXPIRACAO), state='readonly', width=20) if variavel is self.config_expiracao else ttk.Entry(campo_base, textvariable=variavel, width=22)
             campo.pack(fill='x')
             self.campos_config.append(campo)
         self.salvar_config = ttk.Button(config, text='Salvar parâmetros', command=self.salvar_parametros)
@@ -315,7 +316,7 @@ class Painel:
             self.label(config, value, size=11)
         help_page = self.pages['ajuda']
         ttk.Label(help_page, text='Entenda o que o robô faz', font=('Segoe UI Variable Display', 22)).pack(anchor='w', pady=(0, 20))
-        for title, text in [('Só observar', 'Acompanha os preços e registra sinais. Não envia ordens e não calcula resultados hipotéticos.'), ('DEMO automática', 'Abre operações sozinho usando saldo virtual. CALL é previsão de alta; PUT é previsão de queda.'), ('A regra da entrada', 'Após a bolinha fechada, observa a seta em tempo real e espera o recuo escolhido no Início, desde a abertura dessa mesma vela da seta. A seta pode desaparecer enquanto a vela está aberta; sua detecção fica registrada, mas um sinal contrário cancela a oportunidade. Na compra, abaixo; na venda, acima. Sinais continuam em velas de 1 minuto; a expiração pode ser de 1 a 5 minutos. Só envia até o segundo 29.'), ('Saldo e resultados', 'Saldo consultado a cada 3 segundos, mais o tempo de resposta da API, e após resultados. Ganhos e perdas somam todas as sessões do dia local. A taxa é ganhos divididos pelas operações concluídas, incluindo empates; pendentes ficam fora. Não há garantia de assertividade.'), ('Ao encerrar', 'Novas entradas param. Ordens já abertas continuam na corretora e devem ser conferidas na IQ Option.')]:
+        for title, text in [('Só observar', 'Acompanha os preços e registra sinais. Não envia ordens e não calcula resultados hipotéticos.'), ('DEMO automática', 'Abre operações sozinho usando saldo virtual. CALL é previsão de alta; PUT é previsão de queda.'), ('A regra da entrada', 'Após a bolinha fechada, observa a seta em tempo real e espera o recuo escolhido no Início, desde a abertura dessa mesma vela da seta. A seta pode desaparecer enquanto a vela está aberta; sua detecção fica registrada, mas um sinal contrário cancela a oportunidade. Na compra, abaixo; na venda, acima. Sinais continuam em velas de 1 minuto; a expiração solicitada pode ser de 30 segundos ou de 1 a 5 minutos. Só envia até o segundo 29.'), ('Saldo e resultados', 'Saldo consultado a cada 3 segundos, mais o tempo de resposta da API, e após resultados. Ganhos e perdas somam todas as sessões do dia local. A taxa é ganhos divididos pelas operações concluídas, incluindo empates; pendentes ficam fora. Não há garantia de assertividade.'), ('Ao encerrar', 'Novas entradas param. Ordens já abertas continuam na corretora e devem ser conferidas na IQ Option.')]:
             ttk.Label(help_page, text=title, font=('Segoe UI Variable Text', 12, 'bold')).pack(anchor='w', pady=(12, 5))
             ttk.Label(help_page, text=text, style='Sub.TLabel', wraplength=850).pack(anchor='w')
         # Navegação fixa deixa as abas nomeadas sempre visíveis.
@@ -440,7 +441,7 @@ class Painel:
             messagebox.showerror('Parâmetros inválidos', str(exc))
             return
         modo = self.modo.get()
-        if modo == 'demo' and not messagebox.askyesno('Confirmar operações DEMO', f"O bot abrirá operações de valor {parametros['valor']:.2f} na moeda da conta, com expiração de {parametros['expiracao']} minuto(s) e recuo de {parametros['pips']:g} pips.\n\nSomente PRACTICE (saldo virtual). Deseja iniciar na DEMO?"):
+        if modo == 'demo' and not messagebox.askyesno('Confirmar operações DEMO', f"O bot abrirá operações de valor {parametros['valor']:.2f} na moeda da conta, com expiração de {formatar_expiracao(parametros['expiracao'])} e recuo de {parametros['pips']:g} pips.\n\nSomente PRACTICE (saldo virtual). Deseja iniciar na DEMO?"):
             return
         if not self.salvar_parametros():
             return
@@ -787,7 +788,7 @@ class Painel:
         lado = 'CALL ↑ · ALTA' if entrada['direcao'] == 'CALL' else 'PUT ↓ · BAIXA'
         self.entrada_par.set(f"{entrada['ativo']}   {lado}")
         self.label_par_entrada.configure(fg='#65c78b' if entrada['direcao'] == 'CALL' else '#ff929c')
-        self.entrada_info.set(f"Entrada às {entrada['hora']} · Valor {entrada['valor']} · Expiração {entrada['expiracao']} min · ID {entrada['id']}")
+        self.entrada_info.set(f"Entrada às {entrada['hora']} · Valor {entrada['valor']} · Expiração {formatar_expiracao(entrada['expiracao'])} · ID {entrada['id']}")
         abertas = ' · '.join(f"{e['ativo']} ({e['direcao']})" for e in self.entradas_ativas.values())
         self.entrada_abertas.set('Aguardando resultado: ' + abertas if abertas else 'Veja o mesmo par na IQ Option · gráfico M1 · conta DEMO')
         self.destaque_entrada.pack(fill='x')

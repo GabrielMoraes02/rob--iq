@@ -3,6 +3,7 @@ import json
 import sys
 from pathlib import Path
 from caminhos import pasta_recursos, pasta_dados
+import expiracao_ordem  # Inclui o adaptador no motor empacotado.
 
 if '--diagnostico-conexao' in sys.argv:
     from conexao_iq import diagnosticar_transporte
@@ -80,6 +81,9 @@ def acompanhar_saldo(iq, parar, atualizar):
 
 ClasseOriginal = stable_api.IQ_Option
 class ContaPainel(ClasseOriginal):
+    def buy_by_raw_expirations(self, price, active, direction, option, expired):
+        return expiracao_ordem.comprar_por_vencimento_api(self, price, active, direction, option, expired)
+
     def change_balance(self, tipo):
         global saldo_stop, saldo_agora
         if saldo_stop is not None:
