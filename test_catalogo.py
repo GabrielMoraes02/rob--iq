@@ -15,6 +15,23 @@ def resposta_opcoes():
 
 
 class Catalogo(unittest.TestCase):
+    def test_dispatcher_real_preserva_mensagens_da_conexao(self):
+        from websocket import WebSocketApp
+        recebidas = []
+        class Cliente:
+            def on_message(self, mensagem):
+                recebidas.append(mensagem)
+        socket = WebSocketApp('wss://example.invalid', on_message=Cliente().on_message)
+        api = SimpleNamespace(websocket=socket)
+        instalar_consulta(api)
+        socket._callback(socket.on_message, '{"name":"profile","msg":{}}')
+        self.assertEqual(recebidas, ['{"name":"profile","msg":{}}'])
+        def enviar(nome, msg, request_id):
+            socket._callback(socket.on_message, json.dumps({'request_id': request_id, 'msg': resposta_opcoes()}))
+        api.send_websocket_request = enviar
+        self.assertEqual(api.consulta_catalogo.consultar('get-initialization-data', '4.0', {}, timeout=.1), resposta_opcoes())
+        self.assertEqual(len(recebidas), 1)
+
     def test_preserva_modalidades_e_whitelist_sem_dados_privados(self):
         linhas = normalizar_catalogo('Opções', resposta_opcoes(), 100)
         self.assertEqual(len(linhas), 3)

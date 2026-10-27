@@ -5,6 +5,7 @@ import threading
 import time
 import unicodedata
 import uuid
+from types import MethodType
 
 FONTES = (
     ('Opções', 'get-initialization-data', '4.0', {}),
@@ -63,11 +64,13 @@ class ConsultaCatalogo:
 def instalar_consulta(api):
     consulta = ConsultaCatalogo(api)
     original = api.websocket.on_message
-    def receber(*args):
+    def receber(_websocket, *args):
         if args and consulta.receber(args[-1]):
             return
         return original(*args)
-    api.websocket.on_message = receber
+    # websocket-client 0.56 injeta o socket em funções, mas não em métodos.
+    # Preserve o método ligado para não repassar um argumento extra ao SDK.
+    api.websocket.on_message = MethodType(receber, api.websocket)
     api.consulta_catalogo = consulta
 
 
