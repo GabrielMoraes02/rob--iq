@@ -9,7 +9,7 @@ from configuracao import validar_configuracao, carregar_configuracao, salvar_con
 class Configuracao(unittest.TestCase):
     def test_validacao_e_padrao(self):
         self.assertEqual(validar_configuracao({}), PADRAO)
-        self.assertEqual(validar_configuracao({'pips': '4,5', 'valor': '12,75', 'expiracao': '5'}), {'pips': 4.5, 'valor': 12.75, 'expiracao': 5, 'pares': PARES_OTC})
+        self.assertEqual(validar_configuracao({'pips': '4,5', 'valor': '12,75', 'expiracao': '5'}), {'sem_recuo': False, 'pips': 4.5, 'valor': 12.75, 'expiracao': 5, 'pares': PARES_OTC})
 
     def test_invalidos_nao_sao_aceitos(self):
         for dados in [[], {'pips': 0}, {'pips': '-3'}, {'pips': 'NaN'}, {'valor': 'Infinity'}, {'valor': 0}, {'valor': '10.001'}, {'expiracao': '1.5'}, {'expiracao': 0}, {'expiracao': 6}]:
@@ -29,6 +29,16 @@ class Configuracao(unittest.TestCase):
         motor = SimpleNamespace()
         aplicar_no_motor(motor, {'pips': 4, 'valor': 50, 'expiracao': 3})
         self.assertEqual((motor.CORRECAO_PIPS, motor.VALOR, motor.EXPIRACAO), (4, 50, 3))
+
+    def test_sem_recuo_persiste_e_chega_ao_motor_sem_apagar_pips(self):
+        motor = SimpleNamespace()
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1]/'.bot-temp') as pasta:
+            salvar_configuracao(pasta, {'sem_recuo': True, 'pips': 2})
+            aplicar_no_motor(motor, carregar_configuracao(pasta))
+        self.assertIs(motor.SEM_RECUO, True)
+        self.assertEqual(motor.CORRECAO_PIPS, 2)
+        self.assertFalse(validar_configuracao({'pips': 2})['sem_recuo'])
+        with self.assertRaises(ValueError): validar_configuracao({'sem_recuo': 'false'})
 
     def test_pares_selecionados_persistem_e_chegam_ao_motor(self):
         motor=SimpleNamespace()

@@ -47,6 +47,26 @@ class Botoes(unittest.TestCase):
             self.assertEqual(valores[1], rotulo)
             self.assertIn(motivo, valores[2])
 
+    def test_sem_recuo_selecao_salvar_reabrir_e_bloquear(self):
+        from configuracao import carregar_configuracao
+        self.app.config_pips.set('2')
+        self.app.sem_recuo_opcao.invoke()
+        self.assertTrue(self.app.config_sem_recuo.get())
+        self.assertEqual(str(self.app.campos_config[0].cget('state')), 'disabled')
+        self.assertTrue(self.app.salvar_parametros())
+        salvo = carregar_configuracao(Path(self.temp.name))
+        self.assertTrue(salvo['sem_recuo'])
+        self.assertEqual(salvo['pips'], 2)
+        self.app.bloquear_parametros(True)
+        self.app.sem_recuo_opcao.invoke()
+        self.assertTrue(self.app.config_sem_recuo.get())
+        self.app.bloquear_parametros(False)
+        self.assertEqual(str(self.app.campos_config[0].cget('state')), 'disabled')
+        self.app.sem_recuo_opcao.invoke()
+        self.assertFalse(self.app.config_sem_recuo.get())
+        self.assertEqual(str(self.app.campos_config[0].cget('state')), 'normal')
+        self.assertEqual(self.app.config_pips.get(), '2')
+
     def test_abas_e_historico_abrem_e_fecham(self):
         for botao, _, _, chave in self.app.nav_items:
             botao.invoke()

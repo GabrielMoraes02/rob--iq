@@ -26,6 +26,9 @@ def autoteste(destino):
         for par, variavel in app.pares_config.items():
             variavel.set(par in selecionados)
         assert set(app.parametros_digitados()['pares']) == set(selecionados)
+        app.sem_recuo_opcao.invoke()
+        assert app.parametros_digitados()['sem_recuo'] is True
+        assert str(app.campos_config[0].cget('state')) == 'disabled'
         app.config_expiracao.set('30 segundos')
         assert app.parametros_digitados()['expiracao'] == 0.5
         app.som_ativo.set(False)
@@ -74,7 +77,7 @@ def autoteste(destino):
             'tls_inicializado': contexto.verify_mode == ssl.CERT_REQUIRED,
             'titulo': root.title(), 'destaque_de_entrada_testado': True,
             'pares_disponiveis': len(app.pares_config), 'selecao_de_pares_testada': True,
-            'expiracao_30s_testada': True,
+            'expiracao_30s_testada': True, 'opcao_sem_recuo_testada': True,
             'botao_parar_encerrou_motor_e_filho': True,
             'dados_fora_do_executavel': pasta_dados() != pasta_recursos(),
             'painel_sem_login': True, 'nenhuma_ordem_enviada': True}

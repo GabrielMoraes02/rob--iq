@@ -17,6 +17,7 @@ VALOR = 20
 EXPIRACAO = 1
 LIMITE_SEGUNDO = 29
 CORRECAO_PIPS = 3
+SEM_RECUO = False
 MARGEM_SEGURANCA = 0   # confirma horario novamente antes da chamada de ordem
 PIP_REJEICAO = 0.5
 INTERVALO = 1.0
@@ -297,7 +298,7 @@ def processar(ativo, velas, estado, agora, enviar_ordem, iq, disponibilidade_con
     # A seta é observada INTRABAR na vela seguinte à bolinha, sem esperar fechar.
     t_entrada = a['t'] + 60
     if agora >= t_entrada + LIMITE_SEGUNDO + 1:
-        escrever(ativo, 'DESCARTADO', f'seta_ou_recuo_ausente_ate_segundo_29 pips={CORRECAO_PIPS:g} seta_t={t_entrada} entrada_t={t_entrada}')
+        escrever(ativo, 'DESCARTADO', f'condicoes_ausentes_ate_segundo_29 sem_recuo={int(SEM_RECUO)} pips={CORRECAO_PIPS:g} seta_t={t_entrada} entrada_t={t_entrada}')
         estado['alerta'] = None
         return
     if agora < t_entrada or atual['t'] != t_entrada:
@@ -333,13 +334,16 @@ def processar(ativo, velas, estado, agora, enviar_ordem, iq, disponibilidade_con
     # A consulta por velas nao garante captura do instante exato do toque.
     preco_atual = atual['c']
     corrigiu = (preco_atual <= alvo if a['lado'] == 'CALL' else preco_atual >= alvo)
-    if not corrigiu:
+    if not SEM_RECUO and not corrigiu:
         return
     if atual['t'] == estado['ultima_operada']:
         return
     estado['ultima_operada'] = atual['t']
     detalhe = f"{a['lado']} segundo={segundo:.1f} referencia={referencia:.6f} base=abertura_entrada alvo={alvo:.6f} preco_lido={atual['c']:.6f} pips={CORRECAO_PIPS:g} valor={VALOR:.2f} expiracao={EXPIRACAO} seta_t={a['t_seta']} entrada_t={t_entrada} modo=mesma_vela_seta"
-    escrever(ativo, 'CORRECAO_PIPS', detalhe + f" bolinha_t={a['t']}")
+    if SEM_RECUO:
+        detalhe = detalhe.replace(f'alvo={alvo:.6f}', 'alvo=nao_aplicado').replace(f'pips={CORRECAO_PIPS:g}', 'pips=nao_aplicado')
+    detalhe += f' sem_recuo={int(SEM_RECUO)}'
+    escrever(ativo, 'ENTRADA_SEM_RECUO' if SEM_RECUO else 'CORRECAO_PIPS', detalhe + f" bolinha_t={a['t']}")
     if not enviar_ordem:
         escrever(ativo, 'SINAL_SIMULADO', detalhe)
     else:

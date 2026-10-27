@@ -1,4 +1,4 @@
-# Código-fonte do Bot Marcos — Windows 1.0.8
+# Código-fonte do Bot Marcos — Windows 1.0.9
 
 Esta pasta é o projeto original editável. O executável é gerado a partir
 destes arquivos; alterar o código não modifica um EXE que já foi gerado.
@@ -60,7 +60,7 @@ Uma versão Windows deve ser gerada no Windows; este build não gera `.app`.
 ## O que o comando entrega
 
 - `dist-windows\BotMarcos.exe`: aplicativo final para o cliente, com o motor e o Python incluídos.
-- `dist-windows\BOT_MARCOS_WINDOWS_1.0.8.zip`: pacote com o EXE e `LEIA-ME.txt`.
+- `dist-windows\BOT_MARCOS_WINDOWS_1.0.9.zip`: pacote com o EXE e `LEIA-ME.txt`.
 - `dist-motor\MotorMarcos.exe`: componente interno; não é o arquivo para o cliente abrir.
 - `build-*`: arquivos intermediários; não precisam ser enviados ao cliente.
 
@@ -197,3 +197,14 @@ flags de abertura; nunca a resposta integral, credenciais ou sessoes.
 Testes simulam a resposta e exercitam os metodos reais da SDK com transporte
 falso para conferir os IDs de velas e ordens. A disponibilidade e aceitacao
 atuais dependem da resposta da corretora na sessao do cliente.
+
+## Entrada sem recuo (1.0.9)
+
+`sem_recuo` e booleano, persistido e enviado ao motor. Configuracoes antigas
+continuam com False. O valor positivo de pips fica preservado para voltar ao
+modo com recuo. Nao se usa pips=0 para simular desativacao do filtro.
+Quando ativado, SEM_RECUO ignora apenas a comparacao entre preco e alvo.
+Bolinha anterior, seta da mesma direcao, cancelamento contrario, prazo de
+29 segundos, disponibilidade, PRACTICE e limite por vela continuam obrigatorios.
+O evento ENTRADA_SEM_RECUO identifica a condicao atingida; DEMO_ENVIADA
+continua dependendo da aceitacao da ordem pela corretora.

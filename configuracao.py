@@ -6,7 +6,7 @@ from pathlib import Path
 
 PARES_OTC = ['EURUSD-OTC', 'GBPUSD-OTC', 'USDJPY-OTC', 'EURJPY-OTC', 'GBPJPY-OTC']
 PARES_DISPONIVEIS = PARES_OTC + [par.removesuffix('-OTC') for par in PARES_OTC]
-PADRAO = {'pips': 3.0, 'valor': 20.0, 'expiracao': 1, 'pares': PARES_OTC.copy()}
+PADRAO = {'sem_recuo': False, 'pips': 3.0, 'valor': 20.0, 'expiracao': 1, 'pares': PARES_OTC.copy()}
 OPCOES_EXPIRACAO = {'30 segundos': 0.5, '1 minuto': 1, '2 minutos': 2,
                     '3 minutos': 3, '4 minutos': 4, '5 minutos': 5}
 
@@ -34,6 +34,9 @@ def validar_configuracao(dados):
         if not valor.is_finite():
             raise ValueError(f'{titulo}: digite um número finito.')
         return valor
+    sem_recuo = dados.get('sem_recuo', False)
+    if type(sem_recuo) is not bool:
+        raise ValueError('Selecione um modo de recuo válido.')
     pips = numero('pips', 'Recuo em pips')
     valor = numero('valor', 'Valor por entrada')
     expiracao = numero('expiracao', 'Expiração')
@@ -46,7 +49,7 @@ def validar_configuracao(dados):
     pares = dados.get('pares', PARES_OTC)
     if not isinstance(pares, list) or not pares or any(not isinstance(par, str) or par not in PARES_DISPONIVEIS for par in pares):
         raise ValueError('Selecione pelo menos um dos pares disponíveis no painel.')
-    return {'pips': float(pips), 'valor': float(valor), 'expiracao': 0.5 if expiracao == Decimal('0.5') else int(expiracao),
+    return {'sem_recuo': sem_recuo, 'pips': float(pips), 'valor': float(valor), 'expiracao': 0.5 if expiracao == Decimal('0.5') else int(expiracao),
             'pares': list(dict.fromkeys(pares))}
 
 
@@ -70,6 +73,7 @@ def aplicar_no_motor(motor, dados):
     dados = validar_configuracao(dados)
     motor.VALOR = dados['valor']
     motor.CORRECAO_PIPS = dados['pips']
+    motor.SEM_RECUO = dados['sem_recuo']
     motor.EXPIRACAO = dados['expiracao']
     motor.ATIVOS = dados['pares'].copy()
     return dados

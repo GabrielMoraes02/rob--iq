@@ -126,6 +126,29 @@ class Entrada(unittest.TestCase):
                 self.ciclo(t,v,estado,iq,13)
                 self.assertEqual(len(iq.chamadas),1)
 
+    def test_sem_recuo_envia_na_deteccao_call_e_put_uma_vez(self):
+        for lado in ('CALL', 'PUT'):
+            with self.subTest(lado=lado), patch.object(bot, 'SEM_RECUO', True):
+                t, v, estado, iq = self.cenario_intrabar(lado)
+                log = self.ciclo(t, v, estado, iq, 5)
+                self.assertEqual(iq.chamadas, [(20, 'EURUSD-OTC', lado.lower(), 1)])
+                self.assertTrue(any(c.args[1] == 'ENTRADA_SEM_RECUO' for c in log.call_args_list))
+                self.assertFalse(any(c.args[1] == 'CORRECAO_PIPS' for c in log.call_args_list))
+                self.ciclo(t, v, estado, iq, 6)
+                self.assertEqual(len(iq.chamadas), 1)
+
+    def test_sem_recuo_preserva_demais_condicoes(self):
+        for caso in ('sem_bolinha', 'sem_seta', 'contrario', 'prazo', 'fechado', 'real', 'observacao'):
+            with self.subTest(caso=caso), patch.object(bot, 'SEM_RECUO', True):
+                t, v, estado, iq = self.cenario_intrabar('CALL')
+                if caso == 'sem_bolinha': estado['ultima_fechada'] = t-60
+                if caso == 'real': iq.get_balance_mode = lambda: 'REAL'
+                direcao = None if caso == 'sem_seta' else 'PUT' if caso == 'contrario' else 'CALL'
+                with patch.object(bot, 'seta', return_value=direcao):
+                    self.ciclo(t, v, estado, iq, 30 if caso == 'prazo' else 5,
+                               enviar=caso != 'observacao', aberto=caso != 'fechado')
+                self.assertEqual(iq.chamadas, [])
+
     def test_nao_carrega_seta_para_proxima_vela(self):
         t,v,estado,iq=self.cenario_intrabar('CALL')
         self.ciclo(t,v,estado,iq,5)

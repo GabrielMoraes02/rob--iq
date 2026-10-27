@@ -29,8 +29,9 @@ EXPLICACOES = {
     'RESULTADO_NAO_CONFIRMADO': 'Resultado não confirmado. Confira a operação na plataforma.',
     'BOLINHA_CALCULADA': 'Primeiro sinal encontrado. Aguarda confirmação na próxima vela.',
     'SETA_CONFIRMADA': 'Direção confirmada. Aguarda o recuo configurado contra a abertura da nova vela.',
-    'SETA_DETECTADA': 'Seta observada em tempo real. Aguarda o recuo nesta mesma vela, até o segundo 29.',
+    'SETA_DETECTADA': 'Seta observada em tempo real. Avaliando a entrada conforme o modo de recuo escolhido.',
     'CORRECAO_3_PIPS': 'O último preço recebido atingiu a correção de 3 pips dentro da janela.',
+    'ENTRADA_SEM_RECUO': 'Seta detectada: entrada preparada sem esperar recuo.',
     'CORRECAO_PIPS': 'O último preço recebido atingiu o recuo configurado dentro da janela.',
     'CONFIGURACAO': 'Parâmetros utilizados nesta sessão.',
     'EXPIRACAO_SOLICITADA': 'Preparado vencimento de 30 segundos para a API turbo. Veja o horário solicitado nos detalhes.',
@@ -105,6 +106,7 @@ class Painel:
         except (OSError, ValueError, TypeError):
             configuracao = dict(PADRAO)
             self.erro_configuracao = 'Configuração salva inválida. Revise e salve os parâmetros antes de iniciar.'
+        self.config_sem_recuo = tk.BooleanVar(value=configuracao['sem_recuo'])
         self.config_pips = tk.StringVar(value=str(configuracao['pips']).replace('.', ','))
         self.config_valor = tk.StringVar(value=str(configuracao['valor']).replace('.', ','))
         self.config_expiracao = tk.StringVar(value=formatar_expiracao(configuracao['expiracao']))
@@ -309,6 +311,10 @@ class Painel:
             campo = ttk.Combobox(campo_base, textvariable=variavel, values=tuple(OPCOES_EXPIRACAO), state='readonly', width=20) if variavel is self.config_expiracao else ttk.Entry(campo_base, textvariable=variavel, width=22)
             campo.pack(fill='x')
             self.campos_config.append(campo)
+        self.sem_recuo_opcao = ttk.Checkbutton(config, text='Sem recuo — entrar ao detectar a seta',
+            variable=self.config_sem_recuo, command=self.atualizar_modo_recuo)
+        self.sem_recuo_opcao.pack(anchor='w', pady=(10, 0))
+        self.atualizar_modo_recuo()
         self.salvar_config = ttk.Button(config, text='Salvar parâmetros', command=self.salvar_parametros)
         self.salvar_config.pack(fill='x', pady=(14, 6))
         self.escolher_pares = ttk.Button(config, textvariable=self.pares_texto, command=self.abrir_pares)
@@ -320,7 +326,7 @@ class Painel:
             self.label(config, value, size=11)
         help_page = self.pages['ajuda']
         ttk.Label(help_page, text='Entenda o que o robô faz', font=('Segoe UI Variable Display', 22)).pack(anchor='w', pady=(0, 20))
-        for title, text in [('Só observar', 'Acompanha os preços e registra sinais. Não envia ordens e não calcula resultados hipotéticos.'), ('DEMO automática', 'Abre operações sozinho usando saldo virtual. CALL é previsão de alta; PUT é previsão de queda.'), ('A regra da entrada', 'Após a bolinha fechada, observa a seta em tempo real e espera o recuo escolhido no Início, desde a abertura dessa mesma vela da seta. A seta pode desaparecer enquanto a vela está aberta; sua detecção fica registrada, mas um sinal contrário cancela a oportunidade. Na compra, abaixo; na venda, acima. Sinais continuam em velas de 1 minuto; a expiração solicitada pode ser de 30 segundos ou de 1 a 5 minutos. Só envia até o segundo 29.'), ('Saldo e resultados', 'Saldo consultado a cada 3 segundos, mais o tempo de resposta da API, e após resultados. Ganhos e perdas somam todas as sessões do dia local. A taxa é ganhos divididos pelas operações concluídas, incluindo empates; pendentes ficam fora. Não há garantia de assertividade.'), ('Ao encerrar', 'Novas entradas param. Ordens já abertas continuam na corretora e devem ser conferidas na IQ Option.')]:
+        for title, text in [('Só observar', 'Acompanha os preços e registra sinais. Não envia ordens e não calcula resultados hipotéticos.'), ('DEMO automática', 'Abre operações sozinho usando saldo virtual. CALL é previsão de alta; PUT é previsão de queda.'), ('A regra da entrada', 'Após a bolinha fechada, observa a seta em tempo real e aplica o modo escolhido no Início: esperar o recuo desde a abertura dessa vela ou entrar ao detectar a seta, sem recuo. A seta pode desaparecer enquanto a vela está aberta; sua detecção fica registrada, mas um sinal contrário cancela a oportunidade. Na compra, abaixo; na venda, acima. Sinais continuam em velas de 1 minuto; a expiração solicitada pode ser de 30 segundos ou de 1 a 5 minutos. Só envia até o segundo 29.'), ('Saldo e resultados', 'Saldo consultado a cada 3 segundos, mais o tempo de resposta da API, e após resultados. Ganhos e perdas somam todas as sessões do dia local. A taxa é ganhos divididos pelas operações concluídas, incluindo empates; pendentes ficam fora. Não há garantia de assertividade.'), ('Ao encerrar', 'Novas entradas param. Ordens já abertas continuam na corretora e devem ser conferidas na IQ Option.')]:
             ttk.Label(help_page, text=title, font=('Segoe UI Variable Text', 12, 'bold')).pack(anchor='w', pady=(12, 5))
             ttk.Label(help_page, text=text, style='Sub.TLabel', wraplength=850).pack(anchor='w')
         # Navegação fixa deixa as abas nomeadas sempre visíveis.
@@ -357,7 +363,7 @@ class Painel:
             button.configure(bg='#3d2e23' if key == item_key else '#202229', fg='#ffab66' if key == item_key else '#989dab')
 
     def parametros_digitados(self):
-        return validar_configuracao({'pips': self.config_pips.get(), 'valor': self.config_valor.get(), 'expiracao': self.config_expiracao.get(),
+        return validar_configuracao({'sem_recuo': self.config_sem_recuo.get(), 'pips': self.config_pips.get(), 'valor': self.config_valor.get(), 'expiracao': self.config_expiracao.get(),
                                     'pares': [par for par, variavel in self.pares_config.items() if variavel.get()]})
 
     def atualizar_pares_selecionados(self):
@@ -424,9 +430,16 @@ class Painel:
         self.config_status.set('Salvo · será aplicado ao iniciar a próxima sessão.')
         return True
 
+    def atualizar_modo_recuo(self):
+        bloqueado = bool(self.processo and self.processo.poll() is None)
+        self.campos_config[0].configure(state='disabled' if bloqueado or self.config_sem_recuo.get() else 'normal')
+
     def bloquear_parametros(self, bloqueado):
         for campo in self.campos_config:
             campo.configure(state='disabled' if bloqueado else 'readonly' if isinstance(campo, ttk.Combobox) else 'normal')
+        self.sem_recuo_opcao.configure(state='disabled' if bloqueado else 'normal')
+        if not bloqueado and self.config_sem_recuo.get():
+            self.campos_config[0].configure(state='disabled')
         self.salvar_config.configure(state='disabled' if bloqueado else 'normal')
         self.escolher_pares.configure(state='disabled' if bloqueado else 'normal')
 
@@ -445,7 +458,8 @@ class Painel:
             messagebox.showerror('Parâmetros inválidos', str(exc))
             return
         modo = self.modo.get()
-        if modo == 'demo' and not messagebox.askyesno('Confirmar operações DEMO', f"O bot abrirá operações de valor {parametros['valor']:.2f} na moeda da conta, com expiração de {formatar_expiracao(parametros['expiracao'])} e recuo de {parametros['pips']:g} pips.\n\nSomente PRACTICE (saldo virtual). Deseja iniciar na DEMO?"):
+        descricao_recuo = 'sem recuo, ao detectar a seta' if parametros['sem_recuo'] else f"recuo de {parametros['pips']:g} pips"
+        if modo == 'demo' and not messagebox.askyesno('Confirmar operações DEMO', f"O bot abrirá operações de valor {parametros['valor']:.2f} na moeda da conta, com expiração de {formatar_expiracao(parametros['expiracao'])} e {descricao_recuo}.\n\nSomente PRACTICE (saldo virtual). Deseja iniciar na DEMO?"):
             return
         if not self.salvar_parametros():
             return
