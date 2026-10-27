@@ -29,10 +29,20 @@ if '--autoteste' in sys.argv:
     from historico_nuvem import Historico
     from saldo_painel import consultar_saldo_demo
     assert (pasta_recursos() / 'MARCOS_2027_V19_5_OTC_AUDITORIA_SEGURA.py').is_file()
+    spec_teste = importlib.util.spec_from_file_location('motor_autoteste',
+        pasta_recursos() / 'MARCOS_2027_V19_5_OTC_AUDITORIA_SEGURA.py')
+    motor_teste = importlib.util.module_from_spec(spec_teste)
+    spec_teste.loader.exec_module(motor_teste)
+    from iqoptionapi.constants import ACTIVES
+    resposta = {'turbo': {'actives': {str(ACTIVES['EURUSD']):
+        {'enabled': 1, 'is_suspended': 0}}}}
+    assert motor_teste.interpretar_disponibilidade(resposta, ACTIVES, ['EURUSD'])['EURUSD'] is True
+    resposta['turbo']['actives'][str(ACTIVES['EURUSD'])].pop('is_suspended')
+    assert motor_teste.interpretar_disponibilidade(resposta, ACTIVES, ['EURUSD'])['EURUSD'] is None
     assert Path(certifi.where()).is_file()
     contexto = ssl.create_default_context(cafile=certifi.where())
     print(json.dumps({'ok': True, 'frozen': bool(getattr(sys, 'frozen', False)),
-        'corretora_importada': True, 'sqlite': sqlite3.sqlite_version,
+        'corretora_importada': True, 'disponibilidade_testada': True, 'sqlite': sqlite3.sqlite_version,
         'requests': requests.__version__, 'certificados': True,
         'tls_inicializado': contexto.verify_mode == ssl.CERT_REQUIRED,
         'sem_conexao_e_sem_ordens': True}), flush=True)

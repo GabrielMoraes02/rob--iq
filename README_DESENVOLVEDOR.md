@@ -1,4 +1,4 @@
-# Código-fonte do Bot Marcos — Windows 1.0.6
+# Código-fonte do Bot Marcos — Windows 1.0.7
 
 Esta pasta é o projeto original editável. O executável é gerado a partir
 destes arquivos; alterar o código não modifica um EXE que já foi gerado.
@@ -60,7 +60,7 @@ Uma versão Windows deve ser gerada no Windows; este build não gera `.app`.
 ## O que o comando entrega
 
 - `dist-windows\BotMarcos.exe`: aplicativo final para o cliente, com o motor e o Python incluídos.
-- `dist-windows\BOT_MARCOS_WINDOWS_1.0.6.zip`: pacote com o EXE e `LEIA-ME.txt`.
+- `dist-windows\BOT_MARCOS_WINDOWS_1.0.7.zip`: pacote com o EXE e `LEIA-ME.txt`.
 - `dist-motor\MotorMarcos.exe`: componente interno; não é o arquivo para o cliente abrir.
 - `build-*`: arquivos intermediários; não precisam ser enviados ao cliente.
 
@@ -172,3 +172,18 @@ e só então volta ao estado parado. Fechar a janela também espera a parada.
 ordens. O autoteste do EXE inicia um MotorMarcos inerte com --teste-processo,
 clica no botão de parada e verifica a ausência do processo filho. Esse modo
 inerte não se conecta à corretora e não executa o motor de negociação.
+
+## Disponibilidade dos pares (1.0.7)
+
+A consulta Turbo cruza as chaves de `actives` com os mesmos codigos de
+`iqoptionapi.constants.ACTIVES` usados por velas e ordens. Nomes alternativos
+na resposta nao mudam o instrumento negociado. Nao troca codigos nem usa
+abertura em Digital/Binary para liberar Turbo.
+
+Flags booleanas e inteiros 0/1 sao reconhecidos. `enabled=false` ou
+`is_suspended=true` confirmam bloqueio. Abertura exige `enabled=true` e
+`is_suspended=false`; campos ausentes/invalidos ficam como nao confirmados.
+Cada evento informa o motivo, sem copiar a resposta da API ou dados de sessao.
+Testes cobrem os dez codigos, dados incompletos, suspensao, IDs divergentes,
+reconsulta e apresentacao na interface. Validacao local nao comprova a
+disponibilidade atual dos mercados na conta da corretora.

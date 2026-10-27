@@ -1,4 +1,4 @@
-BOT MARCOS - WINDOWS 1.0.6
+BOT MARCOS - WINDOWS 1.0.7
 
 1. Extraia o ZIP inteiro para uma pasta do seu computador.
 2. Abra BotMarcos.exe com dois cliques.
@@ -19,7 +19,7 @@ A senha nao e salva. Ao reabrir o programa, entre novamente na conta.
 Nao precisa instalar Python, Tkinter ou executar arquivos CMD.
 O programa ja inclui as dependencias. A primeira abertura pode levar alguns
 segundos. E necessario acesso a internet para a corretora e o historico.
-Confira 'Windows 1.0.6' no titulo da janela. Feche a versao anterior antes
+Confira 'Windows 1.0.7' no titulo da janela. Feche a versao anterior antes
 de abrir esta; nao execute dois robos na mesma conta ao mesmo tempo.
 
 Quando uma ordem DEMO for aceita, o topo do painel destaca o par, CALL/PUT,
@@ -41,7 +41,8 @@ nao le os desenhos na tela. Diferencas de atualizacao podem afetar o instante.
 
 COMO ACOMPANHAR A ENTRADA NA IQ OPTION
 Entre na mesma conta e selecione saldo de pratica/DEMO. Abra o par EXATO
-mostrado no destaque, inclusive o sufixo OTC, e use velas de 1 minuto (M1).
+mostrado no destaque, inclusive o sufixo OTC, na modalidade Binarias/Turbo,
+e use velas de 1 minuto (M1). Digital e outra modalidade.
 CALL/ALTA e compra; PUT/BAIXA e venda. Compare horario, valor e ID com os
 detalhes da operacao na plataforma. O destaque so aparece depois que a
 ordem foi aceita; uma seta ou sinal sozinho ainda nao e uma entrada.
@@ -108,3 +109,11 @@ painel informa que ela nao foi confirmada e permite tentar novamente.
 Ao fechar a janela, o painel espera encerrar o motor antes de sair.
 Isso impede novas entradas; ordens ja abertas seguem ate o vencimento
 na corretora e devem ser conferidas diretamente na IQ Option.
+
+DISPONIBILIDADE DOS PARES (1.0.7)
+Aberto: a corretora confirmou o ativo em Binarias/Turbo.
+Fechado: a corretora informou que o ativo esta desabilitado ou suspenso.
+Nao confirmada: faltam dados, o codigo nao consta na lista ou a consulta falhou.
+O motivo aparece em Atividade ao vivo. O robo consulta novamente a cada minuto.
+Selecionar um par ou aumentar a expiracao nao garante que ele esteja aberto.
+O mesmo par disponivel em Digital nao confirma disponibilidade em Binarias/Turbo.

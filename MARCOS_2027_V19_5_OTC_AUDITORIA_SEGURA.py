@@ -35,41 +35,70 @@ def pip(ativo):
     return 0.01 if 'JPY' in ativo else 0.0001
 
 
-def consultar_abertura_binaria(iq):
-    """Consulta somente as opcoes binarias/turbo, sem endpoint digital instavel.
+class Disponibilidade(dict):
+    """Estados de abertura e motivos, sem dados pessoais da resposta da API."""
+    def __init__(self):
+        super().__init__()
+        self.motivos = {}
 
-    Retorna (ativo -> bool). Dados ausentes mantem ordens bloqueadas.
-    """
-    import inspect
-    metodo = iq.get_all_init_v2
-    parametros = inspect.signature(metodo).parameters
-    if 'polling' in parametros:
-        dados = metodo(polling=0.1)
-    else:
-        dados = metodo()
+
+def flag_disponibilidade(valor):
+    # JSON booleano e as variantes numericas 0/1 da API; sem bool("false").
+    if type(valor) is bool:
+        return valor
+    if type(valor) is int and valor in (0, 1):
+        return bool(valor)
+    return None
+
+
+def interpretar_disponibilidade(dados, codigos, selecionados):
     if not isinstance(dados, dict):
         raise ValueError('Dados de opcoes binarias/turbo nao recebidos da corretora')
-    saida = {}
-    for categoria in ('turbo', 'binary'):
-        bloco = dados.get(categoria)
-        if not isinstance(bloco, dict):
-            continue
-        ativos = bloco.get('actives')
-        if not isinstance(ativos, dict):
-            continue
-        for item in ativos.values():
-            if not isinstance(item, dict):
-                continue
-            nome = str(item.get('name', '')).split('.')[-1]
-            if not nome:
-                continue
-            aberto = item.get('enabled') is True and item.get('is_suspended') is False
-            # Para expiracao de um minuto, somente categoria turbo determina abertura.
-            if categoria == 'turbo':
-                saida[nome] = aberto
-    if not saida:
-        raise ValueError('Lista de ativos turbo vazia/invalida; nenhuma ordem permitida')
+    bloco = dados.get('turbo')
+    ativos = bloco.get('actives') if isinstance(bloco, dict) else None
+    saida = Disponibilidade()
+    for nome in selecionados:
+        codigo = codigos.get(nome)
+        motivo = 'Resposta de Binarias/Turbo incompleta.'
+        estado = None
+        if codigo is None:
+            motivo = 'Codigo do par nao encontrado na biblioteca de ordens.'
+        elif isinstance(ativos, dict):
+            # O codigo e o mesmo utilizado por get_candles/buy. Nomes podem
+            # variar, mas nunca substituimos um instrumento por outro codigo.
+            itens = [valor for chave, valor in ativos.items() if str(chave) == str(codigo)]
+            if len(itens) != 1 or not isinstance(itens[0], dict):
+                motivo = 'Par ausente ou ambiguo na lista de Binarias/Turbo.'
+            else:
+                item = itens[0]
+                habilitado = flag_disponibilidade(item.get('enabled'))
+                suspenso = flag_disponibilidade(item.get('is_suspended'))
+                if habilitado is False or suspenso is True:
+                    estado = False
+                    motivo = ('Corretora informou par desabilitado em Binarias/Turbo.'
+                              if habilitado is False else 'Corretora informou par suspenso em Binarias/Turbo.')
+                elif habilitado is True and suspenso is False:
+                    estado = True
+                    motivo = 'Abertura confirmada em Binarias/Turbo.'
+                else:
+                    motivo = 'Corretora nao confirmou os campos de abertura em Binarias/Turbo.'
+        saida[nome] = estado
+        saida.motivos[nome] = motivo
     return saida
+
+
+def consultar_abertura_binaria(iq):
+    """Consulta Turbo por codigo: True aberto, False fechado, None desconhecido.
+
+    As expiracoes suportadas (30 s a 5 min) usam Turbo. Disponibilidade em
+    Digital ou Binary nao autoriza uma ordem Turbo.
+    """
+    import inspect
+    from iqoptionapi.constants import ACTIVES
+    metodo = iq.get_all_init_v2
+    parametros = inspect.signature(metodo).parameters
+    dados = metodo(polling=0.1) if 'polling' in parametros else metodo()
+    return interpretar_disponibilidade(dados, ACTIVES, ATIVOS)
 
 
 def ativo_aberto(iq, ativo, tempos=None):
@@ -362,7 +391,9 @@ def main():
                     status_disponibilidade[ativo] = ativo_aberto(iq, ativo, cache_disponibilidade)
                     ultima_disponibilidade[ativo] = agora
                     valor = status_disponibilidade[ativo]
-                    escrever(ativo, 'DISPONIBILIDADE', 'ABERTO' if valor is True else 'FECHADO' if valor is False else 'NAO_CONFIRMADA')
+                    situacao = 'ABERTO' if valor is True else 'FECHADO' if valor is False else 'NAO_CONFIRMADA'
+                    motivo = getattr(cache_disponibilidade, 'motivos', {}).get(ativo, 'Consulta de abertura indisponivel.')
+                    escrever(ativo, 'DISPONIBILIDADE', situacao + '; ' + motivo)
                 if status_disponibilidade[ativo] is not True:
                     continue
                 try:

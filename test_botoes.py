@@ -37,6 +37,16 @@ class Botoes(unittest.TestCase):
     def botao(self, pai, texto):
         return next(w for w in self.filhos(pai) if w.winfo_class() in ('TButton', 'Button') and str(w.cget('text')).startswith(texto))
 
+    def test_disponibilidade_exibe_estado_e_motivo_da_corretora(self):
+        par = 'EURUSD-OTC'
+        for estado, rotulo in [('NAO_CONFIRMADA', 'Não confirmada'), ('FECHADO', 'Fechado'), ('ABERTO', 'Aberto')]:
+            motivo = 'Motivo de teste em Binarias/Turbo.'
+            self.app.fila.put(f'[12:00:00] {par} | DISPONIBILIDADE | {estado}; {motivo}')
+            self.app.poll()
+            valores = self.app.ativos.item(par, 'values')
+            self.assertEqual(valores[1], rotulo)
+            self.assertIn(motivo, valores[2])
+
     def test_abas_e_historico_abrem_e_fecham(self):
         for botao, _, _, chave in self.app.nav_items:
             botao.invoke()

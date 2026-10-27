@@ -723,11 +723,14 @@ class Painel:
                     evento, detalhe = partes[1], partes[2] if len(partes) > 2 else ''
                     texto = EXPLICACOES.get(evento, evento.replace('_', ' ').capitalize())
                     if evento == 'DISPONIBILIDADE':
-                        texto = {'ABERTO': 'Ativo aberto. Aguardando novos sinais.', 'FECHADO': 'Ativo fechado. Não será acompanhado.', 'NAO_CONFIRMADA': 'Abertura não confirmada. Ativo bloqueado.'}.get(detalhe, detalhe)
+                        situacao, _, motivo = detalhe.partition('; ')
+                        texto = {'ABERTO': 'Ativo aberto. Aguardando novos sinais.', 'FECHADO': 'Ativo fechado. Não será acompanhado.', 'NAO_CONFIRMADA': 'Abertura não confirmada. Ativo bloqueado.'}.get(situacao, situacao)
+                        if motivo:
+                            texto += ' ' + motivo
                         if self.ativos.exists(ativo):
-                            mercado = {'ABERTO': 'Aberto', 'FECHADO': 'Fechado', 'NAO_CONFIRMADA': 'Não confirmada'}.get(detalhe, detalhe)
+                            mercado = {'ABERTO': 'Aberto', 'FECHADO': 'Fechado', 'NAO_CONFIRMADA': 'Não confirmada'}.get(situacao, situacao)
                             anterior = self.ativos.item(ativo, 'values')
-                            etapa = anterior[2] if detalhe == 'ABERTO' and anterior[1] == 'Aberto' else texto
+                            etapa = anterior[2] if situacao == 'ABERTO' and anterior[1] == 'Aberto' else texto
                             self.ativos.item(ativo, values=(ativo, mercado, etapa))
                     elif self.ativos.exists(ativo):
                         valores = self.ativos.item(ativo, 'values')
