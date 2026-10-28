@@ -717,7 +717,22 @@ class Painel:
 
     def poll(self):
         try:
-            while True:
+            self.consumir_fila()
+        except Exception as erro:
+            # Uma mensagem/consulta com erro nao pode matar o timer que tambem
+            # confirma Parar e libera uma nova conexao. Nao registrar payloads.
+            try:
+                self.evento('', 'PAINEL', 'Falha ao atualizar um item; retomando atualização (' + type(erro).__name__ + ').', 'ERRO_PAINEL')
+            except Exception:
+                pass
+        finally:
+            if not self.encerrado:
+                self.root.after(150, self.poll)
+
+    def consumir_fila(self):
+        try:
+            # Devolver o controle ao Tk mesmo com fluxo continuo de mensagens.
+            for _ in range(100):
                 linha = self.fila.get_nowait()
                 if isinstance(linha, tuple) and linha[0] == 'falha_parada':
                     if linha[1] is self.processo:
@@ -794,7 +809,6 @@ class Painel:
                     self.evento('', 'SISTEMA', linha, linha)
         except queue.Empty:
             pass
-        self.root.after(150, self.poll)
 
     def notificar_entrada(self):
         if self.som_ativo.get():

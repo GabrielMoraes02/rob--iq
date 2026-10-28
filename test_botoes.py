@@ -52,6 +52,34 @@ class Botoes(unittest.TestCase):
             self.assertEqual(valores[1], rotulo)
             self.assertIn(motivo, valores[2])
 
+    def test_erro_de_mensagem_nao_mata_atualizacao_nem_finalizacao(self):
+        processo = Mock()
+        processo.stdin = io.StringIO()
+        self.app.processo = processo
+        self.app.parando = True
+        self.app.iniciar.configure(state='disabled')
+        self.app.fila.put('__PAINEL__{invalido')
+        self.app.fila.put(('parada', processo))
+        # Usar o timer real, sem chamar poll manualmente para ressuscita-lo.
+        limite = time.monotonic() + 2
+        while self.app.processo is not None and time.monotonic() < limite:
+            self.root.update()
+            time.sleep(.01)
+        self.assertIsNone(self.app.processo)
+        self.assertFalse(self.app.parando)
+        self.assertEqual(str(self.app.iniciar.cget('state')), 'normal')
+        self.app.fila.put('[12:00:00] EURUSD-OTC | DISPONIBILIDADE | ABERTO; Recuperado')
+        limite = time.monotonic() + 1
+        while self.app.ativos.item('EURUSD-OTC', 'values')[1] != 'Aberto' and time.monotonic() < limite:
+            self.root.update()
+            time.sleep(.01)
+        self.assertEqual(self.app.ativos.item('EURUSD-OTC', 'values')[1], 'Aberto')
+
+    def test_fila_grande_devolve_controle_a_interface(self):
+        for _ in range(250): self.app.fila.put('linha sem evento')
+        self.app.consumir_fila()
+        self.assertEqual(self.app.fila.qsize(), 150)
+
     def test_sem_recuo_selecao_salvar_reabrir_e_bloquear(self):
         from configuracao import carregar_configuracao
         self.app.config_pips.set('2')
