@@ -78,15 +78,23 @@ class ParesAoVivo:
 
 
 def acompanhar_binarias(iq, parar, selecao, intervalo=3):
+    falhas = 0
     while not parar.is_set():
         espera = intervalo
+        inicio = time.monotonic()
+        etapa = 'consulta'
         try:
             dados = iq.api.consulta_catalogo.consultar('get-initialization-data', '4.0', {}, timeout=6)
+            etapa = 'interpretacao_lista'
             linhas = listar_binarias(dados)
             consultado = time.time()
             if parar.is_set(): return
             selecao.atualizar_catalogo(dados, consultado)
-            selecao.publicar({'tipo': 'binarias_ao_vivo', 'ativos': linhas, 'consultado_em': consultado, 'erro': ''})
+            selecao.publicar({'tipo': 'binarias_ao_vivo', 'ativos': linhas, 'consultado_em': consultado, 'erro': '',
+                             'diagnostico': {'resultado': 'recuperado' if falhas else 'ok',
+                                             'falhas_consecutivas': falhas,
+                                             'duracao_s': round(time.monotonic()-inicio, 3)}})
+            falhas = 0
         except Exception as erro:
             if parar.is_set(): return
             # Um timeout nao equivale a suspensao. Preserve somente a ultima
@@ -94,11 +102,17 @@ def acompanhar_binarias(iq, parar, selecao, intervalo=3):
             with selecao.lock:
                 anteriores, confirmado = selecao.dados, selecao.consultado_em
             recente = isinstance(erro, TimeoutError) and anteriores is not None and time.time() - confirmado <= 20
+            falhas += 1
+            diagnostico = {'resultado': 'falha', 'erro': type(erro).__name__, 'etapa': etapa,
+                          'duracao_s': round(time.monotonic()-inicio, 3), 'falhas_consecutivas': falhas,
+                          'confirmacao_preservada': recente}
+            diagnostico.update(getattr(erro, 'diagnostico_catalogo', {}))
             if not recente:
                 selecao.atualizar_catalogo(None, 0)
             selecao.publicar({'tipo': 'binarias_ao_vivo',
                              'ativos': listar_binarias(anteriores) if recente else [],
                              'consultado_em': confirmado if recente else 0,
+                             'diagnostico': diagnostico,
                              'erro': ('Atualização atrasada; repetindo consulta. Última confirmação ainda válida.'
                                       if recente else 'Consulta indisponível: ' + type(erro).__name__)})
             espera = min(intervalo, 1)

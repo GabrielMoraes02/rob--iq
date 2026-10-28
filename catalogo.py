@@ -49,6 +49,7 @@ class ConsultaCatalogo:
                 if mensagem.get('name') == 'result':
                     resultado = mensagem.get('msg')
                     if isinstance(resultado, dict) and resultado.get('success') is True:
+                        pendente['ack'] = True
                         return True
                     pendente['erro'] = ConsultaRecusada()
                     pendente['evento'].set()
@@ -61,20 +62,31 @@ class ConsultaCatalogo:
         if not any((nome, versao, corpo) == (n, v, c) for _, n, v, c in FONTES):
             raise ValueError('Somente consultas de catalogo sao permitidas')
         chave = 'catalogo-' + uuid.uuid4().hex
-        pendente = {'evento': threading.Event()}
+        pendente = {'evento': threading.Event(), 'ack': False}
+        inicio = time.monotonic()
+        etapa = 'envio'
         with self.lock:
             self.pendentes[chave] = pendente
         try:
             self.api.send_websocket_request('sendMessage',
                 {'name': nome, 'version': versao, 'body': corpo}, request_id=chave)
+            etapa = 'aguardando_resposta'
             if not pendente['evento'].wait(timeout):
                 raise TimeoutError('Sem resposta do catalogo')
             if 'erro' in pendente:
+                etapa = 'recusa'
                 raise pendente['erro']
+            etapa = 'validacao_resposta'
             resultado = pendente.get('resposta')
             if not isinstance(resultado, dict):
                 raise RespostaCatalogoInvalida()
             return resultado
+        except Exception as erro:
+            # Somente metadados locais: nunca mensagem, request_id ou corpo bruto.
+            erro.diagnostico_catalogo = {'etapa': etapa,
+                'duracao_s': round(time.monotonic() - inicio, 3),
+                'ack_recebido': pendente['ack']}
+            raise
         finally:
             with self.lock:
                 self.pendentes.pop(chave, None)

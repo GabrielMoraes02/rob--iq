@@ -15,6 +15,20 @@ def resposta_opcoes():
 
 
 class Catalogo(unittest.TestCase):
+    def test_diagnostico_distingue_envio_e_timeout_sem_payload(self):
+        api = Mock()
+        consulta = ConsultaCatalogo(api)
+        api.send_websocket_request.side_effect = OSError('senha-ou-sessao-secreta')
+        with self.assertRaises(OSError) as erro:
+            consulta.consultar('get-initialization-data', '4.0', {})
+        self.assertEqual(erro.exception.diagnostico_catalogo['etapa'], 'envio')
+        self.assertNotIn('secreta', json.dumps(erro.exception.diagnostico_catalogo))
+        api.send_websocket_request.side_effect = None
+        with self.assertRaises(TimeoutError) as erro:
+            consulta.consultar('get-initialization-data', '4.0', {}, timeout=0)
+        self.assertEqual(erro.exception.diagnostico_catalogo['etapa'], 'aguardando_resposta')
+        self.assertFalse(erro.exception.diagnostico_catalogo['ack_recebido'])
+
     def test_ack_positivo_nao_substitui_lista_em_nenhuma_ordem(self):
         for ack_primeiro in (True, False):
             with self.subTest(ack_primeiro=ack_primeiro):

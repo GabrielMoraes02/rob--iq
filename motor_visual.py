@@ -95,6 +95,10 @@ from saldo_painel import consultar_saldo_demo
 
 saida_lock = threading.Lock()
 def publicar(dados):
+    if dados.get('tipo') == 'binarias_ao_vivo':
+        diagnostico = dados.get('diagnostico', {})
+        if diagnostico.get('resultado') in ('falha', 'recuperado'):
+            motor.escrever('GERAL', 'DIAGNOSTICO_CONSULTA', json.dumps(diagnostico, ensure_ascii=True))
     with saida_lock:
         print('__PAINEL__' + json.dumps(dados), flush=True)
 

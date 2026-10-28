@@ -1,7 +1,7 @@
 # Bot Marcos
 
 Aplicativo Windows para acompanhamento de sinais do General e operações
-automáticas na conta **PRACTICE/DEMO**, com saldo virtual. Versão atual: **1.0.17**.
+automáticas na conta **PRACTICE/DEMO**, com saldo virtual. Versão atual: **1.0.18**.
 
 - Catálogo da corretora para consulta: busca, modalidades, OTC e favoritos, sem mudar a operação.
 - Início com login, saldo, histórico e parâmetros; Atividade ao vivo para a sessão atual.
@@ -15,7 +15,7 @@ automáticas na conta **PRACTICE/DEMO**, com saldo virtual. Versão atual: **1.0
 
 ## Para o cliente
 
-Use o pacote `BOT_MARCOS_WINDOWS_1.0.17.zip`, extraia e abra `BotMarcos.exe`.
+Use o pacote `BOT_MARCOS_WINDOWS_1.0.18.zip`, extraia e abra `BotMarcos.exe`.
 Não é necessário instalar Python. Veja [o guia de uso](LEIA_ME_WINDOWS_EXE.txt).
 
 ## Para editar ou gerar uma versão
