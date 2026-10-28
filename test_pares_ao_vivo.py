@@ -1,7 +1,7 @@
 import time
 import unittest
 from unittest.mock import Mock, patch
-from pares_ao_vivo import ParesAoVivo, listar_binarias
+from pares_ao_vivo import ParesAoVivo, listar_binarias, acompanhar_binarias
 from test_entrada import bot
 from expiracao_ordem import comprar_binaria_categoria
 
@@ -14,6 +14,37 @@ def resposta(binary=None, blitz=None):
 
 
 class ParesVivos(unittest.TestCase):
+    def test_timeout_preserva_apenas_confirmacao_recente_sem_renovar_data(self):
+        for idade, erro, preserva in [(5, TimeoutError(), True), (21, TimeoutError(), False),
+                                      (5, ValueError(), False)]:
+            with self.subTest(idade=idade, erro=type(erro).__name__):
+                selecao = ParesAoVivo(['EURUSD'], Mock())
+                selecao.atualizar_catalogo(resposta(['EURUSD']), 100-idade)
+                parar = Mock()
+                parar.is_set.side_effect = [False, False, True]
+                iq = Mock()
+                iq.api.consulta_catalogo.consultar.side_effect = erro
+                with patch('pares_ao_vivo.time.time', return_value=100):
+                    acompanhar_binarias(iq, parar, selecao)
+                self.assertEqual(selecao.dados is not None, preserva)
+                self.assertEqual(selecao.consultado_em, 100-idade if preserva else 0)
+                parar.wait.assert_called_once_with(1)
+
+    def test_recuperacao_e_suspensao_substituem_cache_imediatamente(self):
+        selecao = ParesAoVivo(['EURUSD'], Mock())
+        selecao.atualizar_catalogo(resposta(['EURUSD']), 99)
+        fechado = resposta(['EURUSD'])
+        fechado['binary']['actives']['100']['is_suspended'] = True
+        iq = Mock()
+        iq.api.consulta_catalogo.consultar.side_effect = [TimeoutError(), fechado, resposta(['EURUSD'])]
+        parar = Mock()
+        parar.is_set.side_effect = [False, False, False, False, False, False, True]
+        with patch('pares_ao_vivo.time.time', return_value=100):
+            acompanhar_binarias(iq, parar, selecao)
+        publicados = [c.args[0] for c in selecao.publicar.call_args_list]
+        self.assertEqual([p['ativos'][0]['estado'] for p in publicados], ['Aberto', 'Fechado', 'Aberto'])
+        self.assertEqual([p['consultado_em'] for p in publicados], [99, 100, 100])
+
     def test_filtro_sem_limite_de_dez_e_sem_blitz(self):
         linhas = listar_binarias(resposta(['GBPCHF-op', 'Apple-op'] + [f'Ativo{i}' for i in range(100)], ['EURUSD-op']))
         self.assertEqual(len(linhas), 102)

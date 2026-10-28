@@ -77,8 +77,9 @@ class ParesAoVivo:
             return par in self.pares and par in desejados
 
 
-def acompanhar_binarias(iq, parar, selecao, intervalo=10):
+def acompanhar_binarias(iq, parar, selecao, intervalo=3):
     while not parar.is_set():
+        espera = intervalo
         try:
             dados = iq.api.consulta_catalogo.consultar('get-initialization-data', '4.0', {}, timeout=6)
             linhas = listar_binarias(dados)
@@ -88,7 +89,17 @@ def acompanhar_binarias(iq, parar, selecao, intervalo=10):
             selecao.publicar({'tipo': 'binarias_ao_vivo', 'ativos': linhas, 'consultado_em': consultado, 'erro': ''})
         except Exception as erro:
             if parar.is_set(): return
-            selecao.atualizar_catalogo(None, 0)
-            selecao.publicar({'tipo': 'binarias_ao_vivo', 'ativos': [], 'consultado_em': 0,
-                             'erro': 'Consulta indisponível: ' + type(erro).__name__})
-        parar.wait(intervalo)
+            # Um timeout nao equivale a suspensao. Preserve somente a ultima
+            # confirmacao ainda dentro do limite original de 20s, sem renova-lo.
+            with selecao.lock:
+                anteriores, confirmado = selecao.dados, selecao.consultado_em
+            recente = isinstance(erro, TimeoutError) and anteriores is not None and time.time() - confirmado <= 20
+            if not recente:
+                selecao.atualizar_catalogo(None, 0)
+            selecao.publicar({'tipo': 'binarias_ao_vivo',
+                             'ativos': listar_binarias(anteriores) if recente else [],
+                             'consultado_em': confirmado if recente else 0,
+                             'erro': ('Atualização atrasada; repetindo consulta. Última confirmação ainda válida.'
+                                      if recente else 'Consulta indisponível: ' + type(erro).__name__)})
+            espera = min(intervalo, 1)
+        parar.wait(espera)
