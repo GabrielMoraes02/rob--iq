@@ -247,7 +247,15 @@ class Painel:
         ttk.Button(resumo_parent, text='Abrir atividade ao vivo  →', command=lambda: self.navigate('atividade')).pack(anchor='w', pady=(0, 18))
         connection = tk.Frame(login_parent, bg=self.bg)
         connection.pack(fill='x', pady=(0, 12))
-        activity = self.pages['atividade']
+        activity_canvas = tk.Canvas(self.pages['atividade'], bg=self.bg, highlightthickness=0)
+        activity_scroll = ttk.Scrollbar(self.pages['atividade'], orient='vertical', command=activity_canvas.yview)
+        activity_scroll.pack(side='right', fill='y')
+        activity_canvas.pack(fill='both', expand=True)
+        activity_canvas.configure(yscrollcommand=activity_scroll.set)
+        activity = tk.Frame(activity_canvas, bg=self.bg)
+        activity_window = activity_canvas.create_window((0, 0), window=activity, anchor='nw')
+        activity.bind('<Configure>', lambda e: activity_canvas.configure(scrollregion=activity_canvas.bbox('all')))
+        activity_canvas.bind('<Configure>', lambda e: activity_canvas.itemconfigure(activity_window, width=e.width))
         ttk.Label(activity, text='Sinais, entradas e resultados desta sessão aparecem aqui.', style='Sub.TLabel').pack(anchor='w', pady=(0, 12))
         heading = tk.Frame(activity, bg=self.bg)
         heading.pack(fill='x', pady=(0, 12))
@@ -270,7 +278,8 @@ class Painel:
         ttk.Label(activity, textvariable=self.resultado_texto, style='Sub.TLabel').pack(anchor='w', pady=(0, 18))
         area = ttk.Frame(activity)
         area.pack(fill='both', expand=True)
-        self.historico = ttk.Treeview(area, columns=('hora', 'ativo', 'mensagem'), show='headings', height=5)
+        st.configure('Atividade.Treeview', rowheight=34)
+        self.historico = ttk.Treeview(area, columns=('hora', 'ativo', 'mensagem'), show='headings', height=12, style='Atividade.Treeview')
         for col, title, width in [('hora', 'Horário', 80), ('ativo', 'Ativo', 130), ('mensagem', 'O que aconteceu', 650)]:
             self.historico.heading(col, text=title)
             self.historico.column(col, width=width, stretch=col == 'mensagem')
@@ -706,6 +715,12 @@ class Painel:
             foco.focus_set()
 
     def evento(self, hora, ativo, texto, original):
+        if ' | DISPONIBILIDADE | ' in original:
+            estados = getattr(self, '_ultimos_avisos_disponibilidade', {})
+            if estados.get(ativo) == texto:
+                return
+            estados[ativo] = texto
+            self._ultimos_avisos_disponibilidade = estados
         tag = 'ganho' if 'RESULTADO_WIN' in original else 'perda' if 'RESULTADO_LOSS' in original else 'aviso' if any(x in original for x in ['ERRO', 'BLOQUEADO', 'NAO_CONFIRMADO', 'RECUSADA']) else 'sinal' if any(x in original for x in ['DEMO_ENVIADA', 'SINAL_SIMULADO', 'SETA_CONFIRMADA', 'SETA_DETECTADA']) else ''
         item = self.historico.insert('', 'end', values=(hora, ativo, texto), tags=(tag,))
         self.registros[item] = original
