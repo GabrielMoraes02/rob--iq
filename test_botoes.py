@@ -80,6 +80,32 @@ class Botoes(unittest.TestCase):
         self.app.consumir_fila()
         self.assertEqual(self.app.fila.qsize(), 150)
 
+    def test_estresse_fila_com_erros_parada_e_nova_conexao(self):
+        processo = Mock(stdin=io.StringIO())
+        self.app.processo = processo
+        self.app.parando = True
+        self.app.iniciar.configure(state='disabled')
+        for i in range(1000):
+            self.app.fila.put('__PAINEL__{' if i % 100 == 0 else 'mensagem sem evento')
+        self.app.fila.put(('parada', processo))
+        limite = time.monotonic() + 8
+        while self.app.processo is not None and time.monotonic() < limite:
+            self.root.update(); time.sleep(.01)
+        self.assertIsNone(self.app.processo)
+        self.assertEqual(str(self.app.iniciar.cget('state')), 'normal')
+        self.app.email.insert(0, 'teste@exemplo.test')
+        self.app.senha.insert(0, 'ficticia')
+        novo = Mock(stdin=io.StringIO(), stdout=iter([]))
+        novo.poll.return_value = None
+        novo.wait.return_value = 0
+        with patch.object(painel.subprocess, 'Popen', return_value=novo) as abrir:
+            self.app.iniciar.invoke()
+            abrir.assert_called_once()
+            limite = time.monotonic() + 2
+            while self.app.processo is not None and time.monotonic() < limite:
+                self.root.update(); time.sleep(.01)
+        self.assertIsNone(self.app.processo)
+
     def test_sem_recuo_selecao_salvar_reabrir_e_bloquear(self):
         from configuracao import carregar_configuracao
         self.app.config_pips.set('2')
