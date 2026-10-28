@@ -762,11 +762,11 @@ class Painel:
                     texto = EXPLICACOES.get(evento, evento.replace('_', ' ').capitalize())
                     if evento == 'DISPONIBILIDADE':
                         situacao, _, motivo = detalhe.partition('; ')
-                        texto = {'ABERTO': 'Ativo aberto. Aguardando novos sinais.', 'FECHADO': 'Ativo fechado. Não será acompanhado.', 'NAO_CONFIRMADA': 'Abertura não confirmada. Ativo bloqueado.'}.get(situacao, situacao)
+                        texto = {'ABERTO': 'Ativo aberto. Aguardando novos sinais.', 'FECHADO': 'Sem entradas neste par.', 'NAO_CONFIRMADA': 'Aguardando confirmação da corretora.'}.get(situacao, situacao)
                         if motivo:
-                            texto += ' ' + motivo
+                            texto += ' ' + motivo.split(' Consulta:', 1)[0]
                         if self.ativos.exists(ativo):
-                            mercado = {'ABERTO': 'Aberto', 'FECHADO': 'Fechado', 'NAO_CONFIRMADA': 'Não confirmada'}.get(situacao, situacao)
+                            mercado = {'ABERTO': 'Aberto', 'FECHADO': 'Binárias indisponíveis', 'NAO_CONFIRMADA': 'Consulta pendente'}.get(situacao, situacao)
                             anterior = self.ativos.item(ativo, 'values')
                             etapa = anterior[2] if situacao == 'ABERTO' and anterior[1] == 'Aberto' else texto
                             self.ativos.item(ativo, values=(ativo, mercado, etapa))

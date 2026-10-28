@@ -44,7 +44,7 @@ class Botoes(unittest.TestCase):
 
     def test_disponibilidade_exibe_estado_e_motivo_da_corretora(self):
         par = 'EURUSD-OTC'
-        for estado, rotulo in [('NAO_CONFIRMADA', 'Não confirmada'), ('FECHADO', 'Fechado'), ('ABERTO', 'Aberto')]:
+        for estado, rotulo in [('NAO_CONFIRMADA', 'Consulta pendente'), ('FECHADO', 'Binárias indisponíveis'), ('ABERTO', 'Aberto')]:
             motivo = 'Motivo de teste em Binarias/Turbo.'
             self.app.fila.put(f'[12:00:00] {par} | DISPONIBILIDADE | {estado}; {motivo}')
             self.app.poll()

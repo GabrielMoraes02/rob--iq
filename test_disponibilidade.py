@@ -5,6 +5,29 @@ from test_entrada import bot
 
 
 class Disponibilidade(unittest.TestCase):
+    def test_aviso_blitz_exige_confirmacao_e_nao_libera_ordem(self):
+        item = {'name': 'front.EURUSD', 'enabled': True, 'is_suspended': True}
+        for aberto in (True, False, None):
+            blitz = dict(item, is_suspended=not aberto) if aberto is not None else {'name': 'front.EURUSD'}
+            resultado = bot.interpretar_disponibilidade({'turbo': {'actives': {'1': item}},
+                'blitz': {'actives': {'1': blitz}}}, ['EURUSD'])
+            self.assertIs(resultado['EURUSD'], False)
+            self.assertEqual('Blitz está aberto' in resultado.motivos['EURUSD'], aberto is True)
+            self.assertNotIn('EURUSD', resultado.instrumentos)
+
+    def test_binaria_aberta_nao_bloqueia_por_existir_blitz(self):
+        item = {'name': 'front.EURUSD', 'enabled': True, 'is_suspended': False}
+        resultado = bot.interpretar_disponibilidade({'turbo': {'actives': {'1': item}},
+            'blitz': {'actives': {'1': item}}}, ['EURUSD'])
+        self.assertIs(resultado['EURUSD'], True)
+        self.assertNotIn('Sem novas entradas', resultado.motivos['EURUSD'])
+
+    def test_lista_ausente_nao_afirma_suspensao_ou_blitz(self):
+        resultado = bot.interpretar_disponibilidade({}, ['EURUSD'])
+        self.assertIsNone(resultado['EURUSD'])
+        self.assertNotIn('suspensas', resultado.motivos['EURUSD'])
+        self.assertNotIn('Blitz está aberto', resultado.motivos['EURUSD'])
+
     def ler(self, ativos):
         return bot.interpretar_disponibilidade(
             {'turbo': {'actives': ativos}}, ['EURUSD'])

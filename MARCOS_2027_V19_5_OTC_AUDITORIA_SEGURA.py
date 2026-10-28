@@ -113,6 +113,22 @@ def interpretar_disponibilidade(dados, selecionados):
                 motivo = 'Corretora nao confirmou os campos de abertura ou a identidade em Binarias/Turbo.'
             else:
                 motivo = 'Par e variante -op ausentes na lista de Binarias/Turbo desta conta.'
+            if estado is not True:
+                from catalogo import disponibilidade
+                blitz = dados.get('blitz', {})
+                itens_blitz = blitz.get('actives', {}) if isinstance(blitz, dict) else {}
+                blitz_aberto = isinstance(itens_blitz, dict) and any(
+                    isinstance(item, dict) and nome_instrumento(item.get('name')) in nomes
+                    and disponibilidade(item, time.time()) == 'Aberto'
+                    for item in itens_blitz.values())
+                if estado is False:
+                    motivo = 'Binárias/Turbo suspensas ou desabilitadas pela corretora. Sem novas entradas neste par.'
+                elif not candidatos:
+                    motivo = 'Par não confirmado em Binárias/Turbo nesta consulta. Entradas bloqueadas até confirmação.'
+                if blitz_aberto:
+                    motivo += ' Blitz está aberto, mas o robô opera somente Binárias/Turbo; não muda de modalidade.'
+                else:
+                    motivo += ' Disponibilidade em Blitz não confirmada.'
             if candidatos:
                 # Apenas nomes permitidos, IDs numericos e flags; nunca a resposta integral.
                 resumo = ', '.join(f"{c['nome']} {c['categoria']} id={c['codigo']} habilitado={c['habilitado']} suspenso={c['suspenso']}"
@@ -472,7 +488,7 @@ def main():
                     ultima_disponibilidade[ativo] = agora
                     valor = status_disponibilidade[ativo]
                     situacao = 'ABERTO' if valor is True else 'FECHADO' if valor is False else 'NAO_CONFIRMADA'
-                    motivo = getattr(cache_disponibilidade, 'motivos', {}).get(ativo, 'Consulta de abertura indisponivel.')
+                    motivo = getattr(cache_disponibilidade, 'motivos', {}).get(ativo, 'Falha ou atraso na consulta. Entradas pausadas até atualizar; isso não confirma suspensão nem mudança para Blitz.')
                     escrever(ativo, 'DISPONIBILIDADE', situacao + '; ' + motivo)
                 if status_disponibilidade[ativo] is not True:
                     continue
