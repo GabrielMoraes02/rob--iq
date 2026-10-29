@@ -84,7 +84,7 @@ def acompanhar_binarias(iq, parar, selecao, intervalo=3):
         inicio = time.monotonic()
         etapa = 'consulta'
         try:
-            dados = iq.api.consulta_catalogo.consultar('get-initialization-data', '4.0', {}, timeout=6)
+            dados = iq.api.consulta_catalogo.consultar_opcoes()
             etapa = 'interpretacao_lista'
             linhas = listar_binarias(dados)
             consultado = time.time()

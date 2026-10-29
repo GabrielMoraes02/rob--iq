@@ -23,7 +23,7 @@ class ParesVivos(unittest.TestCase):
                 parar = Mock()
                 parar.is_set.side_effect = [False, False, True]
                 iq = Mock()
-                iq.api.consulta_catalogo.consultar.side_effect = erro
+                iq.api.consulta_catalogo.consultar_opcoes.side_effect = erro
                 with patch('pares_ao_vivo.time.time', return_value=100):
                     acompanhar_binarias(iq, parar, selecao)
                 self.assertEqual(selecao.dados is not None, preserva)
@@ -36,7 +36,7 @@ class ParesVivos(unittest.TestCase):
         fechado = resposta(['EURUSD'])
         fechado['binary']['actives']['100']['is_suspended'] = True
         iq = Mock()
-        iq.api.consulta_catalogo.consultar.side_effect = [TimeoutError(), fechado, resposta(['EURUSD'])]
+        iq.api.consulta_catalogo.consultar_opcoes.side_effect = [TimeoutError(), fechado, resposta(['EURUSD'])]
         parar = Mock()
         parar.is_set.side_effect = [False, False, False, False, False, False, True]
         with patch('pares_ao_vivo.time.time', return_value=100):

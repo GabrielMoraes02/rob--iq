@@ -134,7 +134,8 @@ class Catalogo(unittest.TestCase):
         self.assertTrue(consulta.receber(json.dumps({'request_id': 'catalogo-atrasado', 'msg': {}})))
         parar = threading.Event()
         iq = Mock()
-        iq.api.consulta_catalogo.consultar.side_effect = [resposta_opcoes(), TimeoutError(),
+        iq.api.consulta_catalogo.consultar_opcoes.return_value = resposta_opcoes()
+        iq.api.consulta_catalogo.consultar.side_effect = [TimeoutError(),
             {'instruments': []}, {'instruments': []}, {'instruments': []}]
         publicacoes = []
         def publicar(dados):

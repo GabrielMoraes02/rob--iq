@@ -10,6 +10,48 @@ from catalogo import ConsultaCatalogo
 
 
 class EstresseConsultas(unittest.TestCase):
+    def test_catalogo_e_motor_compartilham_envio_sem_reutilizar_cache(self):
+        enviados = queue.Queue()
+        consulta = ConsultaCatalogo(SimpleNamespace(send_websocket_request=lambda nome, msg, request_id: enviados.put(request_id)))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            primeiro = pool.submit(consulta.consultar_opcoes, 1)
+            chave = enviados.get(timeout=1)
+            # Confirmar que o segundo consumidor chegou a espera compartilhada.
+            iniciou = threading.Event()
+            evento = consulta.opcoes_em_andamento['evento']
+            original_wait = evento.wait
+            def esperar(timeout):
+                iniciou.set()
+                return original_wait(timeout)
+            evento.wait = esperar
+            segundo = pool.submit(consulta.consultar_opcoes, 1)
+            self.assertTrue(iniciou.wait(1))
+            self.assertTrue(enviados.empty())
+            consulta.receber(json.dumps({'request_id': chave, 'msg': {'lista': 1}}))
+            self.assertEqual(primeiro.result(1), {'lista': 1})
+            self.assertEqual(segundo.result(1), {'lista': 1})
+            novo = pool.submit(consulta.consultar_opcoes, 1)
+            nova_chave = enviados.get(timeout=1)
+            self.assertNotEqual(chave, nova_chave)
+            consulta.receber(json.dumps({'request_id': nova_chave, 'msg': {'lista': 2}}))
+            self.assertEqual(novo.result(1), {'lista': 2})
+
+    def test_consulta_compartilhada_libera_apos_timeout_e_aceita_resposta_lenta(self):
+        enviados = queue.Queue()
+        consulta = ConsultaCatalogo(SimpleNamespace(send_websocket_request=lambda nome, msg, request_id: enviados.put(request_id)))
+        with self.assertRaises(TimeoutError): consulta.consultar_opcoes(timeout=0)
+        self.assertIsNone(consulta.opcoes_em_andamento)
+        enviados.get_nowait()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            futuro = pool.submit(consulta.consultar_opcoes, .3)
+            chave = enviados.get(timeout=1)
+            # Escala reduzida: resposta apos o limite antigo, antes do novo.
+            timer = threading.Timer(.15, lambda: consulta.receber(json.dumps({'request_id': chave, 'msg': {'ok': True}})))
+            timer.start()
+            self.assertEqual(futuro.result(1), {'ok': True})
+            timer.join()
+        self.assertEqual(consulta.pendentes, {})
+
     def test_400_consultas_concorrentes_respostas_fora_de_ordem(self):
         enviados = queue.Queue()
         api = SimpleNamespace(send_websocket_request=lambda nome, msg, request_id: enviados.put(request_id))

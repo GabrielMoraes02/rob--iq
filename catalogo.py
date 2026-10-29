@@ -30,6 +30,33 @@ class ConsultaCatalogo:
         self.api = api
         self.pendentes = {}
         self.lock = threading.Lock()
+        self.opcoes_em_andamento = None
+
+    def consultar_opcoes(self, timeout=12):
+        """Catalogo e motor compartilham apenas a consulta em andamento, sem cache."""
+        with self.lock:
+            consulta = self.opcoes_em_andamento
+            responsavel = consulta is None
+            if responsavel:
+                consulta = {'evento': threading.Event()}
+                self.opcoes_em_andamento = consulta
+        if responsavel:
+            try:
+                consulta['resposta'] = self.consultar('get-initialization-data', '4.0', {}, timeout=timeout)
+            except Exception as erro:
+                consulta['erro'] = erro
+            finally:
+                with self.lock:
+                    self.opcoes_em_andamento = None
+                    consulta['evento'].set()
+        elif not consulta['evento'].wait(timeout):
+            erro = TimeoutError('Consulta compartilhada sem resposta')
+            erro.diagnostico_catalogo = {'etapa': 'aguardando_consulta_compartilhada',
+                                        'duracao_s': timeout, 'ack_recebido': False}
+            raise erro
+        if 'erro' in consulta:
+            raise consulta['erro']
+        return consulta['resposta']
 
     def receber(self, bruto):
         try:
@@ -200,7 +227,10 @@ def acompanhar_catalogo(iq, parar, publicar, intervalo=60):
         for fonte, nome, versao, corpo in FONTES:
             if parar.is_set(): return
             try:
-                dados = iq.api.consulta_catalogo.consultar(nome, versao, corpo)
+                if fonte == 'Opções':
+                    dados = iq.api.consulta_catalogo.consultar_opcoes()
+                else:
+                    dados = iq.api.consulta_catalogo.consultar(nome, versao, corpo)
                 registros.extend(normalizar_catalogo(fonte, dados))
                 if fonte == 'Opções':
                     for categoria in ('binary', 'turbo', 'blitz'):
