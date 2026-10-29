@@ -1,11 +1,6 @@
 name: Aplicativo macOS
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '**.py'
-      - 'requirements*.txt'
-      - '.github/workflows/macos.yml'
 permissions:
   contents: read
 jobs:

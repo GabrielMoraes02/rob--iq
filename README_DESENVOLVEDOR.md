@@ -1,4 +1,4 @@
-# Código-fonte do Bot Marcos — Windows 1.0.19
+# Código-fonte do Bot Marcos — Windows 1.0.20
 
 Esta pasta é o projeto original editável. O executável é gerado a partir
 destes arquivos; alterar o código não modifica um EXE que já foi gerado.
@@ -60,7 +60,7 @@ Uma versão Windows deve ser gerada no Windows; este build não gera `.app`.
 ## O que o comando entrega
 
 - `dist-windows\BotMarcos.exe`: aplicativo final para o cliente, com o motor e o Python incluídos.
-- `dist-windows\BOT_MARCOS_WINDOWS_1.0.19.zip`: pacote com o EXE e `LEIA-ME.txt`.
+- `dist-windows\BOT_MARCOS_WINDOWS_1.0.20.zip`: pacote com o EXE e `LEIA-ME.txt`.
 - `dist-motor\MotorMarcos.exe`: componente interno; não é o arquivo para o cliente abrir.
 - `build-*`: arquivos intermediários; não precisam ser enviados ao cliente.
 
@@ -233,7 +233,7 @@ A lista depende do retorno da conta/regiao e pode diferir dos destaques e
 rankings da interface web. Nao inventa percentuais, tendencias ou mercados
 que a API nao retornou. Nao habilita negociacao em Blitz/Digital/Margem.
 
-## Selecao de Binarias durante a conexao (1.0.19)
+## Selecao de Binarias durante a conexao (1.0.20)
 
 `pares_ao_vivo.py` consulta a lista de Binarias/Turbo a cada 10 segundos
 mais tempo de resposta. Blitz/Digital nao entram no seletor. A lista perde
@@ -258,27 +258,27 @@ a sintaxe e tamanho; a disponibilidade e identidade sao verificadas na
 sessao. Busca, OTC, so disponiveis, selecionados e marcar visiveis nao
 alteram valor, recuo, modo de operacao nem expiracao.
 
-## Correcao do recebimento WebSocket (1.0.19)
+## Correcao do recebimento WebSocket (1.0.20)
 
 O interceptador do catalogo preserva um metodo ligado, conforme o dispatcher do websocket-client instalado. Uma funcao simples recebia um argumento extra e impedia o SDK de processar mensagens normais da conexao. O teste usa WebSocketApp._callback real para verificar tanto mensagens normais quanto respostas correlacionadas do catalogo, sem login ou ordens.
 
-## Respostas de confirmacao do catalogo (1.0.19)
+## Respostas de confirmacao do catalogo (1.0.20)
 
 O SDK ativa setOptions(sendResults=True). O coletor agora ignora result/success=True e aguarda a lista correlacionada ao mesmo request_id. Recusas encerram a consulta com ConsultaRecusada, sem divulgar a resposta. Uma confirmacao tardia nao sobrescreve a lista. Testes cobrem ACK antes/depois, ACK sem lista, recusa e limpeza das consultas pendentes. Validacao autenticada depende da sessao do usuario.
 
-## Recuperacao de consultas (1.0.19)
+## Recuperacao de consultas (1.0.20)
 Atualiza Binarias a cada 3s apos resposta e repete apos 1s em falha. Timeout preserva apenas snapshot confirmado com no maximo 20s, sem renovar sua data. Dados expirados, respostas invalidas e recusas invalidam o snapshot. Suspensao recebida substitui imediatamente o estado anterior. O limite pre-ordem de 20s permanece. Testes locais; estabilidade autenticada ainda requer observacao.
 
-## Continuidade do painel (1.0.19)
+## Continuidade do painel (1.0.20)
 O timer de consumo da fila agora e reagendado em finally mesmo quando uma mensagem falha. O lote fica limitado a 100 itens para devolver controle ao Tk. Erros exibem apenas a classe da excecao, sem payload ou credenciais. Teste com timer real injeta JSON invalido antes da confirmacao de parada, verifica liberacao do botao Iniciar e atualizacao subsequente. Isso reproduz a vulnerabilidade; o payload causador na sessao original nao foi capturado.
 
-## Atividade ampliada (1.0.19)
+## Atividade ampliada (1.0.20)
 Historico com 12 linhas de 34px em pagina rolavel, evitando compressao pela altura da janela. Avisos identicos consecutivos por par nao repetem no historico visual; mudancas continuam visiveis. Registros persistidos permanecem completos. Inclui correcao do timer da 1.0.16.
 
-## Diagnostico de consulta (1.0.19)
+## Diagnostico de consulta (1.0.20)
 Eventos DIAGNOSTICO_CONSULTA registram falhas e recuperacoes com etapa (envio, resposta, recusa ou interpretacao), classe de erro, duracao, ACK e falhas consecutivas. Nao registram payload, texto de excecao, identificador da requisicao ou credenciais. Os registros antigos nao permitem atribuir a causa exata. Esta versao instrumenta o problema, nao declara a instabilidade resolvida.
 
-## Consulta unica em andamento (1.0.19)
+## Consulta unica em andamento (1.0.20)
 Catalogo e monitor usam consultar_opcoes: consumidores simultaneos compartilham o mesmo envio, resultado ou erro; consultas posteriores nao reutilizam cache. Prazo de resposta de 12s (antes 6s no monitor). Confirmacoes para ordens continuam limitadas a 20s. Testes cobrem concorrencia, timeout, liberacao e nova consulta. Os timeouts reais de 16:10-16:11 motivaram a alteracao; nao ha evidencia suficiente para atribuir o atraso a IQ, rede ou limitacao de frequencia. Estabilidade em sessao autenticada ainda pendente.
 
 
@@ -293,3 +293,15 @@ Os dados ficam em `~/Library/Application Support/BotMarcos`.
 O build ainda exige validacao real de login, saldo e historico em conta DEMO.
 Os artefatos nao possuem assinatura Developer ID nem notarizacao Apple;
 nao devem ser anunciados como distribuicao final validada para clientes.
+
+
+Atualizacao 1.0.20: seta e o gatilho, sem exigir bolinha anterior.
+Bolinha e seta detectadas na mesma vela descartam a oportunidade.
+Espera: segundo minimo desde a abertura (0 a 29), sempre antes de terminar a vela.
+Velas: periodos listados pela API, de 1 segundo a 30 dias; disponibilidade depende da corretora.
+Expiracao permanece independente da duracao da vela.
+Valor: fixo ou percentual do saldo DEMO atualizado antes de cada entrada.
+Percentual arredondado para baixo a centavos; saldo indisponivel bloqueia a entrada.
+O modo Sem recuo dispensa pips; o modo com recuo continua exigindo o alvo.
+Uma bolinha que apareca somente depois da ordem nao permite desfazer a ordem enviada.
+Teste primeiro em So observar. Nenhuma garantia de lucro.

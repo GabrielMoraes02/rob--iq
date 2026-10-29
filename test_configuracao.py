@@ -9,7 +9,13 @@ from configuracao import validar_configuracao, carregar_configuracao, salvar_con
 class Configuracao(unittest.TestCase):
     def test_validacao_e_padrao(self):
         self.assertEqual(validar_configuracao({}), PADRAO)
-        self.assertEqual(validar_configuracao({'pips': '4,5', 'valor': '12,75', 'expiracao': '5'}), {'sem_recuo': False, 'pips': 4.5, 'valor': 12.75, 'expiracao': 5, 'pares': PARES_OTC})
+        self.assertEqual(validar_configuracao({'pips': '4,5', 'valor': '12,75', 'expiracao': '5'}), {**PADRAO, 'sem_recuo': False, 'pips': 4.5, 'valor': 12.75, 'expiracao': 5, 'pares': PARES_OTC})
+
+    def test_novos_parametros_validacao(self):
+        for dados in ({'espera_segundos':-1},{'espera_segundos':30},{'espera_segundos':1.5},{'espera_segundos':5,'vela_segundos':5},{'percentual':0},{'percentual':101},{'percentual':'NaN'},{'vela_segundos':61},{'modo_valor':'outro'}):
+            with self.subTest(dados=dados), self.assertRaises(ValueError):
+                validar_configuracao(dados)
+        self.assertEqual(validar_configuracao({'vela_segundos':'5 minutos','espera_segundos':29})['vela_segundos'],300)
 
     def test_invalidos_nao_sao_aceitos(self):
         for dados in [[], {'pips': 0}, {'pips': '-3'}, {'pips': 'NaN'}, {'valor': 'Infinity'}, {'valor': 0}, {'valor': '10.001'}, {'expiracao': '1.5'}, {'expiracao': 0}, {'expiracao': 6}]:
@@ -59,6 +65,14 @@ class Configuracao(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1]/'.bot-temp') as pasta, patch.object(painel, 'BASE', Path(pasta)):
                 app = painel.Painel(root)
+                app.config_espera.set('12')
+                app.config_vela.set('5 minutos')
+                app.config_modo_valor.set('Percentual da banca')
+                app.config_percentual.set('7,5')
+                self.assertEqual(app.parametros_digitados()['vela_segundos'],300)
+                self.assertEqual(app.parametros_digitados()['percentual'],7.5)
+                self.assertEqual(app.parametros_digitados()['espera_segundos'],12)
+
                 for par, variavel in app.pares_config.items():
                     variavel.set(par in ('EURUSD', 'GBPJPY-OTC'))
                 self.assertTrue(app.salvar_parametros())

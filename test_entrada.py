@@ -57,12 +57,69 @@ class Entrada(unittest.TestCase):
                 self.assertIsNone(estado['alerta'])
                 self.assertEqual(iq.chamadas,[])
 
-    def test_bolinha_e_seta_fechadas_nao_armam_proxima(self):
+    def test_seta_sozinha_sem_bolinha_anterior_envia(self):
         t,v,estado,iq=self.cenario_intrabar('CALL')
-        with patch.object(bot, 'verificar_sinal_historico', return_value={'bolinha':'CALL','seta':'CALL'}):
+        with patch.object(bot, 'bolinha', return_value=None), patch.object(bot, 'seta', return_value='CALL'), patch.object(bot, 'SEM_RECUO', True):
             self.ciclo(t,v,estado,iq,5)
-        self.assertIsNone(estado['alerta'])
+        self.assertEqual(len(iq.chamadas),1)
+
+    def test_espera_desde_abertura_e_limite(self):
+        t,v,estado,iq=self.cenario_intrabar('CALL')
+        with patch.object(bot, 'SEM_RECUO', True), patch.object(bot, 'ESPERA_SEGUNDOS', 12):
+            self.ciclo(t,v,estado,iq,5)
+            self.assertEqual(iq.chamadas,[])
+            self.ciclo(t,v,estado,iq,12)
+            self.assertEqual(len(iq.chamadas),1)
+
+    def test_periodos_usam_mesma_vela_e_nao_proxima(self):
+        from configuracao import OPCOES_VELA
+        for periodo in OPCOES_VELA.values():
+            with self.subTest(periodo=periodo), patch.object(bot, 'VELA_SEGUNDOS', periodo), patch.object(bot, 'SEM_RECUO', True), patch.object(bot, 'seta', return_value='CALL'), patch.object(bot, 'bolinha', return_value=None):
+                t,v,estado,iq=self.cenario_intrabar('CALL')
+                for vela in v:
+                    vela['t']=t+(vela['t']-t)//60*periodo
+                estado={'ultima_fechada':None,'ultima_operada':None,'alerta':None}
+                self.ciclo(t,v,estado,iq,0.5)
+                self.assertEqual(len(iq.chamadas),1)
+                self.ciclo(t,v,estado,iq,0.6)
+                self.assertEqual(len(iq.chamadas),1)
+
+    def test_percentual_consulta_saldo_novo_sem_fallback(self):
+        for saldo,esperado in ((1000,100),(800,80),(0,None),(float('nan'),None)):
+            with self.subTest(saldo=saldo), patch.object(bot,'MODO_VALOR','Percentual da banca'), patch.object(bot,'PERCENTUAL',10), patch.object(bot,'SEM_RECUO',True):
+                t,v,estado,iq=self.cenario_intrabar('CALL')
+                iq.saldo_para_entrada=lambda: saldo
+                self.ciclo(t,v,estado,iq,5)
+                self.assertEqual([x[0] for x in iq.chamadas], [] if esperado is None else [esperado])
+
+    def test_saldo_demora_e_ultrapassa_vela_nao_envia(self):
+        with patch.object(bot,'MODO_VALOR','Percentual da banca'), patch.object(bot,'SEM_RECUO',True), patch.object(bot,'VELA_SEGUNDOS',5), patch.object(bot,'seta',return_value='CALL'), patch.object(bot,'bolinha',return_value=None):
+            t,v,estado,iq=self.cenario_intrabar('CALL')
+            for vela in v:
+                vela['t']=t+(vela['t']-t)//60*5
+            estado={'ultima_fechada':None,'ultima_operada':None,'alerta':None}
+            with patch.object(bot.time,'time',return_value=t+2) as relogio, patch.object(bot,'escrever'):
+                def saldo():
+                    relogio.return_value=t+6
+                    return 1000
+                iq.saldo_para_entrada=saldo
+                bot.processar('EURUSD',v,estado,t+2,True,iq,True)
+            self.assertEqual(iq.chamadas,[])
+
+    def test_percentual_saldo_indisponivel_nao_envia(self):
+        with patch.object(bot,'MODO_VALOR','Percentual da banca'), patch.object(bot,'SEM_RECUO',True):
+            t,v,estado,iq=self.cenario_intrabar('CALL')
+            self.ciclo(t,v,estado,iq,5)
+            self.assertEqual(iq.chamadas,[])
+
+    def test_bolinha_antes_da_seta_na_mesma_vela_descarta(self):
+        t,v,estado,iq=self.cenario_intrabar('CALL')
+        with patch.object(bot,'bolinha',return_value='CALL'), patch.object(bot,'seta',return_value=None):
+            self.ciclo(t,v,estado,iq,3)
+        with patch.object(bot,'bolinha',return_value=None), patch.object(bot,'seta',return_value='CALL'), patch.object(bot,'SEM_RECUO',True):
+            self.ciclo(t,v,estado,iq,5)
         self.assertEqual(iq.chamadas,[])
+        self.assertIsNone(estado['alerta'])
 
     def test_call_toque_antigo_nao_envia(self):
         chamadas, estado = self.executar('CALL', 1.1002)
@@ -166,7 +223,7 @@ class Entrada(unittest.TestCase):
                 self.assertEqual(len(iq.chamadas), 1)
 
     def test_sem_recuo_preserva_demais_condicoes(self):
-        for caso in ('sem_bolinha', 'sem_seta', 'contrario', 'prazo', 'fechado', 'real', 'observacao'):
+        for caso in ('sem_seta', 'prazo', 'fechado', 'real', 'observacao'):
             with self.subTest(caso=caso), patch.object(bot, 'SEM_RECUO', True):
                 t, v, estado, iq = self.cenario_intrabar('CALL')
                 if caso == 'sem_bolinha': estado['ultima_fechada'] = t-60

@@ -141,6 +141,9 @@ def acompanhar_saldo(iq, parar, atualizar):
 
 ClasseOriginal = stable_api.IQ_Option
 class ContaPainel(ClasseOriginal):
+    def saldo_para_entrada(self):
+        return consultar_saldo_demo(self, stable_api.global_value.balance_id)
+
     def verificar_par_para_ordem(self, ativo):
         if not selecao_viva.permite(ativo):
             raise RuntimeError('Par removido da selecao; nenhuma nova ordem permitida.')

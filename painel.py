@@ -13,7 +13,7 @@ import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk, messagebox
-from configuracao import PADRAO, PARES_DISPONIVEIS, OPCOES_EXPIRACAO, formatar_expiracao, carregar_configuracao, salvar_configuracao, validar_configuracao, validar_pares
+from configuracao import OPCOES_VELA, formatar_vela, PADRAO, PARES_DISPONIVEIS, OPCOES_EXPIRACAO, formatar_expiracao, carregar_configuracao, salvar_configuracao, validar_configuracao, validar_pares
 from historico_nuvem import Historico, Sincronizador
 from caminhos import pasta_dados, comando_motor, VERSAO
 from processos import encerrar_motor
@@ -115,6 +115,10 @@ class Painel:
         except (OSError, ValueError, TypeError):
             configuracao = dict(PADRAO)
             self.erro_configuracao = 'Configuração salva inválida. Revise e salve os parâmetros antes de iniciar.'
+        self.config_espera = tk.StringVar(value=str(configuracao['espera_segundos']))
+        self.config_vela = tk.StringVar(value=formatar_vela(configuracao['vela_segundos']))
+        self.config_modo_valor = tk.StringVar(value=configuracao['modo_valor'])
+        self.config_percentual = tk.StringVar(value=str(configuracao['percentual']))
         self.config_sem_recuo = tk.BooleanVar(value=configuracao['sem_recuo'])
         self.config_pips = tk.StringVar(value=str(configuracao['pips']).replace('.', ','))
         self.config_valor = tk.StringVar(value=str(configuracao['valor']).replace('.', ','))
@@ -321,12 +325,13 @@ class Painel:
         self.campos_config = []
         parametros_linha = tk.Frame(config, bg=self.surface)
         parametros_linha.pack(fill='x')
-        for indice, (title, variavel) in enumerate([('Recuo desde a abertura (pips)', self.config_pips), ('Valor por entrada (moeda da conta)', self.config_valor), ('Expiração', self.config_expiracao)]):
-            parametros_linha.columnconfigure(indice, weight=1, uniform='parametros')
+        for indice, (title, variavel) in enumerate([('Recuo desde a abertura (pips)', self.config_pips), ('Valor por entrada (moeda da conta)', self.config_valor), ('Expiração', self.config_expiracao), ('Espera desde início da vela (0–29 s)', self.config_espera), ('Duração da vela', self.config_vela), ('Tipo de valor', self.config_modo_valor), ('Percentual do saldo atual (%)', self.config_percentual)]):
+            parametros_linha.columnconfigure(indice % 3, weight=1, uniform='parametros')
             campo_base = tk.Frame(parametros_linha, bg=self.surface)
-            campo_base.grid(row=0, column=indice, sticky='ew', padx=(0 if indice == 0 else 16, 0))
+            campo_base.grid(row=indice // 3, column=indice % 3, sticky='ew', padx=(0 if indice == 0 else 16, 0))
             self.label(campo_base, title, size=9, color='#9098ab', pady=(12, 3))
-            campo = ttk.Combobox(campo_base, textvariable=variavel, values=tuple(OPCOES_EXPIRACAO), state='readonly', width=20) if variavel is self.config_expiracao else ttk.Entry(campo_base, textvariable=variavel, width=22)
+            opcoes = tuple(OPCOES_EXPIRACAO) if variavel is self.config_expiracao else tuple(OPCOES_VELA) if variavel is self.config_vela else ('Fixo', 'Percentual da banca') if variavel is self.config_modo_valor else None
+            campo = ttk.Combobox(campo_base, textvariable=variavel, values=opcoes, state='readonly', width=20) if opcoes else ttk.Entry(campo_base, textvariable=variavel, width=22)
             campo.pack(fill='x')
             self.campos_config.append(campo)
         self.sem_recuo_opcao = ttk.Checkbutton(config, text='Sem recuo — entrar ao detectar a seta',
@@ -346,7 +351,7 @@ class Painel:
             self.label(config, value, size=11)
         help_page = self.pages['ajuda']
         ttk.Label(help_page, text='Entenda o que o robô faz', font=('Segoe UI Variable Display', 22)).pack(anchor='w', pady=(0, 20))
-        for title, text in [('Só observar', 'Acompanha os preços e registra sinais. Não envia ordens e não calcula resultados hipotéticos.'), ('DEMO automática', 'Abre operações sozinho usando saldo virtual. CALL é previsão de alta; PUT é previsão de queda.'), ('A regra da entrada', 'Após a bolinha fechada, observa a seta em tempo real e aplica o modo escolhido no Início: esperar o recuo desde a abertura dessa vela ou entrar ao detectar a seta, sem recuo. A seta pode desaparecer enquanto a vela está aberta; sua detecção fica registrada, mas um sinal contrário cancela a oportunidade. Na compra, abaixo; na venda, acima. Sinais continuam em velas de 1 minuto; a expiração solicitada pode ser de 30 segundos ou de 1 a 5 minutos. Só envia até o segundo 29.'), ('Saldo e resultados', 'Saldo consultado a cada 3 segundos, mais o tempo de resposta da API, e após resultados. Ganhos e perdas somam todas as sessões do dia local. A taxa é ganhos divididos pelas operações concluídas, incluindo empates; pendentes ficam fora. Não há garantia de assertividade.'), ('Ao encerrar', 'Novas entradas param. Ordens já abertas continuam na corretora e devem ser conferidas na IQ Option.')]:
+        for title, text in [('Só observar', 'Acompanha os preços e registra sinais. Não envia ordens e não calcula resultados hipotéticos.'), ('DEMO automática', 'Abre operações sozinho usando saldo virtual. CALL é previsão de alta; PUT é previsão de queda.'), ('A regra da entrada', 'Observa a seta em tempo real, sem exigir bolinha anterior; bolinha e seta na mesma vela descartam a oportunidade. Aplica o modo escolhido no Início: esperar o recuo desde a abertura dessa vela ou entrar ao detectar a seta, sem recuo. A seta pode desaparecer enquanto a vela está aberta; sua detecção fica registrada, mas um sinal contrário cancela a oportunidade. Na compra, abaixo; na venda, acima. Sinais usam a duração de vela escolhida no Início; a expiração solicitada pode ser de 30 segundos ou de 1 a 5 minutos. Respeita a espera escolhida desde a abertura e só envia até o segundo 29, antes de terminar a vela. Se a bolinha aparecer depois da ordem, não desfaz a ordem.'), ('Saldo e resultados', 'Saldo consultado a cada 3 segundos, mais o tempo de resposta da API, e após resultados. Ganhos e perdas somam todas as sessões do dia local. A taxa é ganhos divididos pelas operações concluídas, incluindo empates; pendentes ficam fora. Não há garantia de assertividade.'), ('Ao encerrar', 'Novas entradas param. Ordens já abertas continuam na corretora e devem ser conferidas na IQ Option.')]:
             ttk.Label(help_page, text=title, font=('Segoe UI Variable Text', 12, 'bold')).pack(anchor='w', pady=(12, 5))
             ttk.Label(help_page, text=text, style='Sub.TLabel', wraplength=850).pack(anchor='w')
         # Navegação fixa deixa as abas nomeadas sempre visíveis.
@@ -383,13 +388,13 @@ class Painel:
             button.configure(bg='#3d2e23' if key == item_key else '#202229', fg='#ffab66' if key == item_key else '#989dab')
 
     def parametros_digitados(self):
-        return validar_configuracao({'sem_recuo': self.config_sem_recuo.get(), 'pips': self.config_pips.get(), 'valor': self.config_valor.get(), 'expiracao': self.config_expiracao.get(),
+        return validar_configuracao({'espera_segundos': self.config_espera.get(), 'vela_segundos': self.config_vela.get(), 'modo_valor': self.config_modo_valor.get(), 'percentual': self.config_percentual.get(), 'sem_recuo': self.config_sem_recuo.get(), 'pips': self.config_pips.get(), 'valor': self.config_valor.get(), 'expiracao': self.config_expiracao.get(),
                                     'pares': [par for par, variavel in self.pares_config.items() if variavel.get()]})
 
     def atualizar_pares_selecionados(self):
         selecionados = [par for par, variavel in self.pares_config.items() if variavel.get()]
         self.pares_texto.set(f'Escolher pares · {len(selecionados)} selecionados')
-        self.mercados_texto.set(f'{len(selecionados)} pares selecionados / velas de 1 minuto')
+        self.mercados_texto.set(f'{len(selecionados)} pares selecionados / velas de {self.config_vela.get()}')
         for par in self.ativos.get_children():
             self.ativos.item(par, values=(par, 'Aguardando' if par in selecionados else 'Não selecionado',
                                          'Conecte a sessão para acompanhar' if par in selecionados else 'Fora desta sessão · não envia ordens'))
@@ -484,7 +489,8 @@ class Painel:
             return
         modo = self.modo.get()
         descricao_recuo = 'sem recuo, ao detectar a seta' if parametros['sem_recuo'] else f"recuo de {parametros['pips']:g} pips"
-        if modo == 'demo' and not messagebox.askyesno('Confirmar operações DEMO', f"O bot abrirá operações de valor {parametros['valor']:.2f} na moeda da conta, com expiração de {formatar_expiracao(parametros['expiracao'])} e {descricao_recuo}.\n\nSomente PRACTICE (saldo virtual). Deseja iniciar na DEMO?"):
+        descricao_valor = f"{parametros['percentual']:g}% do saldo atualizado" if parametros['modo_valor'] == 'Percentual da banca' else f"{parametros['valor']:.2f} na moeda da conta"
+        if modo == 'demo' and not messagebox.askyesno('Confirmar operações DEMO', f"O bot abrirá operações de valor {descricao_valor}, com expiração de {formatar_expiracao(parametros['expiracao'])} e {descricao_recuo}. Vela: {formatar_vela(parametros['vela_segundos'])}. Entrada a partir do segundo {parametros['espera_segundos']}, até o 29 e antes da vela terminar.\n\nSomente PRACTICE (saldo virtual). Deseja iniciar na DEMO?"):
             return
         if not self.salvar_parametros():
             return
@@ -859,7 +865,7 @@ class Painel:
         self.label_par_entrada.configure(fg='#65c78b' if entrada['direcao'] == 'CALL' else '#ff929c')
         self.entrada_info.set(f"Entrada às {entrada['hora']} · Valor {entrada['valor']} · Expiração {formatar_expiracao(entrada['expiracao'])} · ID {entrada['id']}")
         abertas = ' · '.join(f"{e['ativo']} ({e['direcao']})" for e in self.entradas_ativas.values())
-        self.entrada_abertas.set('Aguardando resultado: ' + abertas if abertas else 'Veja o mesmo par na IQ Option · gráfico M1 · conta DEMO')
+        self.entrada_abertas.set('Aguardando resultado: ' + abertas if abertas else f'Veja o mesmo par na IQ Option · vela {self.config_vela.get()} · conta DEMO')
         self.destaque_entrada.pack(fill='x')
 
     def resultado_entrada(self, evento, detalhe):

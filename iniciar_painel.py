@@ -22,6 +22,16 @@ def autoteste(destino):
         assert app.conta_historico is None
         assert app.ler_resultados_salvos() == []
         assert app.modo.get() == 'simulacao'
+        app.config_espera.set('12')
+        app.config_vela.set('5 minutos')
+        app.config_modo_valor.set('Percentual da banca')
+        app.config_percentual.set('10')
+        novos = app.parametros_digitados()
+        assert novos['espera_segundos'] == 12 and novos['vela_segundos'] == 300
+        assert novos['modo_valor'] == 'Percentual da banca' and novos['percentual'] == 10
+        app.config_espera.set('0')
+        app.config_vela.set('1 minuto')
+        app.config_modo_valor.set('Fixo')
         selecionados = ['EURUSD', 'GBPJPY-OTC']
         for par, variavel in app.pares_config.items():
             variavel.set(par in selecionados)

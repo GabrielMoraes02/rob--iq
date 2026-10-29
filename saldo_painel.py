@@ -1,9 +1,25 @@
 """Consulta de saldo demo com prazo limitado; nao envia ordens."""
 import math
 import time
+import threading
+
+_CONSULTA_LOCK = threading.Lock()
 
 
 def consultar_saldo_demo(iq, balance_id, timeout=4.0, detalhado=False):
+    inicio = time.monotonic()
+    if not _CONSULTA_LOCK.acquire(timeout=timeout):
+        raise TimeoutError('Consulta de saldo ocupada')
+    try:
+        restante = timeout - (time.monotonic() - inicio)
+        if restante <= 0:
+            raise TimeoutError('Prazo da consulta de saldo excedido')
+        return _consultar_saldo_demo(iq, balance_id, restante, detalhado)
+    finally:
+        _CONSULTA_LOCK.release()
+
+
+def _consultar_saldo_demo(iq, balance_id, timeout=4.0, detalhado=False):
     if not iq.check_connect() or iq.get_balance_mode() != 'PRACTICE':
         raise RuntimeError('Conta demo ou conexao nao confirmada')
     iq.api.balances_raw = None

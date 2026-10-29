@@ -13,6 +13,10 @@ from configuracao import formatar_expiracao
 from expiracao_ordem import comprar_com_expiracao
 
 ATIVOS = ['EURUSD-OTC', 'GBPUSD-OTC', 'USDJPY-OTC', 'EURJPY-OTC', 'GBPJPY-OTC']
+VELA_SEGUNDOS = 60
+ESPERA_SEGUNDOS = 0
+MODO_VALOR = "Fixo"
+PERCENTUAL = 10.0
 VALOR = 20
 EXPIRACAO = 1
 LIMITE_SEGUNDO = 29
@@ -276,53 +280,24 @@ def segundos_m1(agora):
 
 
 def processar(ativo, velas, estado, agora, enviar_ordem, iq, disponibilidade_confirmada=False):
-    atual = next((v for v in reversed(velas) if v['t'] <= agora < v['t'] + 60), None)
+    atual = next((v for v in reversed(velas) if v['t'] <= agora < v['t'] + VELA_SEGUNDOS), None)
     if atual is None:
         return
-    fechadas = [v for v in velas if v['t'] + 60 <= agora - 0.1]
+    fechadas = [v for v in velas if v['t'] + VELA_SEGUNDOS <= agora - 0.1]
     if len(fechadas) < 15:
         return
-    ultima = fechadas[-1]
-    if estado['ultima_fechada'] != ultima['t']:
-        novos = [v for v in fechadas if estado['ultima_fechada'] is None or v['t'] > estado['ultima_fechada']]
-        estado['ultima_fechada'] = ultima['t']
-        for item in novos:
-            idx = next((j for j, x in enumerate(fechadas) if x['t'] == item['t']), None)
-            if idx is None or idx < 12:
-                continue
-            info = verificar_sinal_historico(fechadas[:idx+1], ativo)
-            # Cada vela fechada e processada UMA vez, inclusive sinais contrarios.
-            # Registra o horario exato da vela, e nao apenas o momento da leitura.
-            lado_novo = info['bolinha']
-            seta_nova = info['seta']
-            if lado_novo and seta_nova:
-                estado['alerta'] = None
-                escrever(ativo, 'DESCARTADO', f'bolinha_e_seta_na_mesma_vela candle={item["t"]}')
-                continue
-            anterior = estado['alerta']
-            if anterior is not None:
-                direcao = anterior['lado']
-                # Sinal contrario invalida alerta antigo, mesmo depois da seta.
-                if (lado_novo and lado_novo != direcao) or (seta_nova and seta_nova != direcao):
-                    escrever(ativo, 'CANCELADO_POR_CONTRARIO',
-                             f"antigo={direcao} nova_bolinha={lado_novo} nova_seta={seta_nova} candle={item['t']}")
-                    estado['alerta'] = None
-                    anterior = None
-                elif item['t'] >= anterior['t']+60:
-                    # A vela da seta acabou; nunca transfere a entrada para a seguinte.
-                    escrever(ativo, 'DESCARTADO', f"vela_da_seta_encerrada bolinha_t={anterior['t']} entrada_t={anterior['t']+60}")
-                    estado['alerta'] = None
-            # Só arma a vela imediatamente após uma bolinha fechada, sem replay.
-            if lado_novo and estado['alerta'] is None and item['t']+60 == atual['t']:
-                estado['alerta'] = {'lado':lado_novo, 't':item['t'], 'seta':False}
-                escrever(ativo, 'BOLINHA_CALCULADA',
-                         f"lado={lado_novo} candle={item['t']} fecha_em={item['t']+60}")
-
+    estado['ultima_fechada'] = fechadas[-1]['t']
+    # A seta e o gatilho. Nao exige bolinha na vela anterior.
+    if estado.get('vela_sinal') != atual['t']:
+        estado['vela_sinal'] = atual['t']
+        anterior = estado.get('alerta')
+        if not anterior or anterior.get('t', 0) + VELA_SEGUNDOS != atual['t']:
+            estado['alerta'] = {'lado': None, 't': atual['t'] - VELA_SEGUNDOS, 'seta': False}
     a = estado['alerta']
     if not a:
         return
-    # A seta é observada INTRABAR na vela seguinte à bolinha, sem esperar fechar.
-    t_entrada = a['t'] + 60
+    # A seta e observada na vela atual, sem esperar seu fechamento.
+    t_entrada = a['t'] + VELA_SEGUNDOS
     if agora >= t_entrada + LIMITE_SEGUNDO + 1:
         escrever(ativo, 'DESCARTADO', f'condicoes_ausentes_ate_segundo_29 sem_recuo={int(SEM_RECUO)} pips={CORRECAO_PIPS:g} seta_t={t_entrada} entrada_t={t_entrada}')
         estado['alerta'] = None
@@ -335,15 +310,21 @@ def processar(ativo, velas, estado, agora, enviar_ordem, iq, disponibilidade_con
     if abs(time.time()-agora) > 2:
         escrever(ativo, 'BLOQUEADO', 'dados de tempo desatualizados')
         return
-    if any(fechadas[-i]['t'] != t_entrada - i*60 for i in (1, 2, 3)):
+    if any(fechadas[-i]['t'] != t_entrada - i*VELA_SEGUNDOS for i in (1, 2, 3)):
         escrever(ativo, 'BLOQUEADO', 'velas_nao_consecutivas_para_calcular_seta')
         return
     seta_atual = seta(atual, fechadas[-1], fechadas[-2], fechadas[-3])
     bolinha_atual = bolinha(atual, fechadas[-1], fechadas[-2])
-    if bolinha_atual and (seta_atual or a['seta']):
+    if bolinha_atual:
+        a['bolinha_vista'] = True
+    if a.get('bolinha_vista') and (seta_atual or a['seta']):
         estado['alerta'] = None
         escrever(ativo, 'DESCARTADO', f'bolinha_e_seta_na_mesma_vela candle={atual["t"]} intrabar=1')
         return
+    if a['lado'] is None:
+        if seta_atual is None:
+            return
+        a['lado'] = seta_atual
     if (seta_atual and seta_atual != a['lado']) or (bolinha_atual and bolinha_atual != a['lado']):
         escrever(ativo, 'CANCELADO_POR_CONTRARIO', f"antigo={a['lado']} nova_seta={seta_atual} nova_bolinha={bolinha_atual} candle={atual['t']} intrabar=1")
         estado['alerta'] = None
@@ -352,10 +333,12 @@ def processar(ativo, velas, estado, agora, enviar_ordem, iq, disponibilidade_con
         if seta_atual != a['lado']:
             return
         a.update(seta=True, t_seta=atual['t'], preco_seta=atual['c'])
-        escrever(ativo, 'SETA_DETECTADA', f"lado={a['lado']} bolinha_t={a['t']} seta_t={atual['t']} entrada_t={t_entrada} segundo={segundo:.1f} preco={atual['c']:.6f} intrabar=1")
+        escrever(ativo, 'SETA_DETECTADA', f"lado={a['lado']} vela_t={atual['t']} seta_t={atual['t']} entrada_t={t_entrada} segundo={segundo:.1f} preco={atual['c']:.6f} intrabar=1")
     # Após detectar a seta, espera o recuo NA MESMA vela. Um estado neutro
     # posterior não apaga a detecção; sinal contrário cancela, e a janela expira.
     # A seta intrabar pode sumir antes do fechamento do indicador visual.
+    if segundo < ESPERA_SEGUNDOS:
+        return
     referencia = atual['o']
     alvo = (referencia - CORRECAO_PIPS*pip(ativo) if a['lado'] == 'CALL'
             else referencia + CORRECAO_PIPS*pip(ativo))
@@ -369,11 +352,26 @@ def processar(ativo, velas, estado, agora, enviar_ordem, iq, disponibilidade_con
     if atual['t'] == estado['ultima_operada']:
         return
     estado['ultima_operada'] = atual['t']
-    detalhe = f"{a['lado']} segundo={segundo:.1f} referencia={referencia:.6f} base=abertura_entrada alvo={alvo:.6f} preco_lido={atual['c']:.6f} pips={CORRECAO_PIPS:g} valor={VALOR:.2f} expiracao={EXPIRACAO} seta_t={a['t_seta']} entrada_t={t_entrada} modo=mesma_vela_seta"
+    valor_entrada = VALOR
+    if MODO_VALOR == 'Percentual da banca':
+        try:
+            from decimal import Decimal, ROUND_DOWN
+            saldo = iq.saldo_para_entrada()
+            saldo_decimal = Decimal(str(saldo))
+            if not saldo_decimal.is_finite() or saldo_decimal <= 0:
+                raise ValueError('Saldo inválido')
+            valor_entrada = float((saldo_decimal * Decimal(str(PERCENTUAL)) / 100).quantize(Decimal('0.01'), rounding=ROUND_DOWN))
+            if not 1 <= valor_entrada <= 1000000:
+                raise ValueError('Valor calculado fora dos limites')
+        except Exception:
+            estado['alerta'] = None
+            escrever(ativo, 'BLOQUEADO', 'percentual: saldo atualizado indisponível ou valor calculado fora dos limites; nenhuma ordem enviada')
+            return
+    detalhe = f"{a['lado']} segundo={segundo:.1f} referencia={referencia:.6f} base=abertura_entrada alvo={alvo:.6f} preco_lido={atual['c']:.6f} pips={CORRECAO_PIPS:g} valor={valor_entrada:.2f} expiracao={EXPIRACAO} seta_t={a['t_seta']} entrada_t={t_entrada} modo=mesma_vela_seta"
     if SEM_RECUO:
         detalhe = detalhe.replace(f'alvo={alvo:.6f}', 'alvo=nao_aplicado').replace(f'pips={CORRECAO_PIPS:g}', 'pips=nao_aplicado')
     detalhe += f' sem_recuo={int(SEM_RECUO)}'
-    escrever(ativo, 'ENTRADA_SEM_RECUO' if SEM_RECUO else 'CORRECAO_PIPS', detalhe + f" bolinha_t={a['t']}")
+    escrever(ativo, 'ENTRADA_SEM_RECUO' if SEM_RECUO else 'CORRECAO_PIPS', detalhe + f" vela_t={atual['t']}")
     if not enviar_ordem:
         escrever(ativo, 'SINAL_SIMULADO', detalhe)
     else:
@@ -383,10 +381,10 @@ def processar(ativo, velas, estado, agora, enviar_ordem, iq, disponibilidade_con
                 escrever(ativo, 'BLOQUEADO', 'conexao ou conta PRACTICE nao confirmada')
             elif not disponibilidade_confirmada:
                 escrever(ativo, 'BLOQUEADO', 'ativo nao confirmado aberto para binaria/turbo')
-            elif time.time() - t_entrada > LIMITE_SEGUNDO:
-                escrever(ativo, 'FORA_DA_JANELA', '29 segundos excedidos antes de enviar')
+            elif time.time() - t_entrada > LIMITE_SEGUNDO or time.time() >= t_entrada + VELA_SEGUNDOS:
+                escrever(ativo, 'FORA_DA_JANELA', 'janela de entrada encerrada antes de enviar')
             else:
-                ok, id_ordem = comprar_com_expiracao(iq, VALOR, ativo, a['lado'].lower(), EXPIRACAO,
+                ok, id_ordem = comprar_com_expiracao(iq, valor_entrada, ativo, a['lado'].lower(), EXPIRACAO,
                     registrar=lambda vencimento: escrever(ativo, 'EXPIRACAO_SOLICITADA',
                         f'duracao_segundos=30 vencimento_ts={vencimento} produto=turbo sem_fallback=1'))
                 escrever(ativo, 'DEMO_ENVIADA' if ok else 'ORDEM_RECUSADA',
@@ -414,8 +412,8 @@ def main():
     print('\nMARCOS 2027 - V19 GENERAL 3 PIPS | PROTOTIPO PARA VALIDACAO')
     print('Bolinha e seta CALCULADAS pelas velas (NAO sao leitura do indicador visual).')
     print(f'Seta intrabar; recuo de {CORRECAO_PIPS:g} pips na mesma vela da seta; ate 29s.')
-    print(f'M1, {len(ATIVOS)} pares selecionados, expiracao {formatar_expiracao(EXPIRACAO)}, valor {VALOR:.2f} na moeda da conta, sem MG.')
-    escrever('GERAL', 'CONFIGURACAO', f'pips={CORRECAO_PIPS:g} valor={VALOR:.2f} expiracao={EXPIRACAO} pares={",".join(ATIVOS)} modo=mesma_vela_seta')
+    print(f'Vela {VELA_SEGUNDOS}s, {len(ATIVOS)} pares selecionados, expiracao {formatar_expiracao(EXPIRACAO)}, valor {VALOR:.2f} na moeda da conta, sem MG.')
+    escrever('GERAL', 'CONFIGURACAO', f'vela_segundos={VELA_SEGUNDOS} espera_segundos={ESPERA_SEGUNDOS} modo_valor={MODO_VALOR} percentual={PERCENTUAL:g} pips={CORRECAO_PIPS:g} valor={VALOR:.2f} expiracao={EXPIRACAO} pares={",".join(ATIVOS)} modo=mesma_vela_seta')
     print('NAO executar V16 ao mesmo tempo. CTRL+C para sair.\n')
     print('1 = SIMULACAO (PADRAO; SEM ORDENS)')
     print('2 = TESTE DEMO (sinais matematicos NAO validados contra General visual)')
@@ -501,7 +499,7 @@ def main():
                 if status_disponibilidade[ativo] is not True:
                     continue
                 try:
-                    bruto = iq.get_candles(ativo,60,35,int(agora))
+                    bruto = iq.get_candles(ativo,VELA_SEGUNDOS,35,int(agora))
                     if not bruto:
                         falhas_consecutivas += 1
                         escrever(ativo, 'SEM_VELAS', f'falhas consecutivas={falhas_consecutivas}')
@@ -512,7 +510,7 @@ def main():
                     velas = sorted((normalizar(v) for v in bruto), key=lambda x:x['t'])
                     # Primeiro ciclo nao usa alertas historicos.
                     if estados[ativo]['ultima_fechada'] is None:
-                        fechadas = [v for v in velas if v['t']+60 <= agora-0.1]
+                        fechadas = [v for v in velas if v['t']+VELA_SEGUNDOS <= agora-0.1]
                         if fechadas:
                             estados[ativo]['ultima_fechada'] = fechadas[-1]['t']
                     processar(ativo,velas,estados[ativo],time.time(),envia,iq,status_disponibilidade[ativo] is True)
