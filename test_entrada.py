@@ -36,6 +36,34 @@ class Entrada(unittest.TestCase):
             bot.processar('EURUSD-OTC', velas, estado, t+segundo, True, iq, True)
         return iq.chamadas, estado
 
+    def test_bolinha_junto_da_seta_descarta_sem_rearmar(self):
+        for lado in ('CALL', 'PUT'):
+            with self.subTest(lado=lado), patch.object(bot, 'SEM_RECUO', True):
+                t,v,estado,iq=self.cenario_intrabar(lado)
+                with patch.object(bot, 'bolinha', side_effect=lambda vela,*args: lado if vela['t'] in (t-60,t) else None), patch.object(bot, 'seta', side_effect=lambda vela,*args: lado if vela['t']==t else None):
+                    self.ciclo(t,v,estado,iq,5)
+                self.assertIsNone(estado['alerta'])
+                self.ciclo(t,v,estado,iq,6)
+                self.assertEqual(iq.chamadas,[])
+
+    def test_bolinha_apos_seta_detectada_cancela_espera_recuo(self):
+        for lado in ('CALL', 'PUT'):
+            with self.subTest(lado=lado):
+                t,v,estado,iq=self.cenario_intrabar(lado)
+                self.ciclo(t,v,estado,iq,5)
+                self.assertTrue(estado['alerta']['seta'])
+                with patch.object(bot, 'bolinha', return_value=lado), patch.object(bot, 'seta', return_value=None):
+                    self.ciclo(t,v,estado,iq,6)
+                self.assertIsNone(estado['alerta'])
+                self.assertEqual(iq.chamadas,[])
+
+    def test_bolinha_e_seta_fechadas_nao_armam_proxima(self):
+        t,v,estado,iq=self.cenario_intrabar('CALL')
+        with patch.object(bot, 'verificar_sinal_historico', return_value={'bolinha':'CALL','seta':'CALL'}):
+            self.ciclo(t,v,estado,iq,5)
+        self.assertIsNone(estado['alerta'])
+        self.assertEqual(iq.chamadas,[])
+
     def test_call_toque_antigo_nao_envia(self):
         chamadas, estado = self.executar('CALL', 1.1002)
         self.assertEqual(chamadas, [])

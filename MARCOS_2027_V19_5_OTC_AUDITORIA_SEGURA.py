@@ -295,6 +295,10 @@ def processar(ativo, velas, estado, agora, enviar_ordem, iq, disponibilidade_con
             # Registra o horario exato da vela, e nao apenas o momento da leitura.
             lado_novo = info['bolinha']
             seta_nova = info['seta']
+            if lado_novo and seta_nova:
+                estado['alerta'] = None
+                escrever(ativo, 'DESCARTADO', f'bolinha_e_seta_na_mesma_vela candle={item["t"]}')
+                continue
             anterior = estado['alerta']
             if anterior is not None:
                 direcao = anterior['lado']
@@ -336,6 +340,10 @@ def processar(ativo, velas, estado, agora, enviar_ordem, iq, disponibilidade_con
         return
     seta_atual = seta(atual, fechadas[-1], fechadas[-2], fechadas[-3])
     bolinha_atual = bolinha(atual, fechadas[-1], fechadas[-2])
+    if bolinha_atual and (seta_atual or a['seta']):
+        estado['alerta'] = None
+        escrever(ativo, 'DESCARTADO', f'bolinha_e_seta_na_mesma_vela candle={atual["t"]} intrabar=1')
+        return
     if (seta_atual and seta_atual != a['lado']) or (bolinha_atual and bolinha_atual != a['lado']):
         escrever(ativo, 'CANCELADO_POR_CONTRARIO', f"antigo={a['lado']} nova_seta={seta_atual} nova_bolinha={bolinha_atual} candle={atual['t']} intrabar=1")
         estado['alerta'] = None
