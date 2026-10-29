@@ -12,7 +12,10 @@ def pasta_recursos():
 
 def pasta_dados():
     if getattr(sys, 'frozen', False):
-        pasta = Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData' / 'Local')) / 'BotMarcos'
+        if sys.platform == 'darwin':
+            pasta = Path.home() / 'Library' / 'Application Support' / 'BotMarcos'
+        else:
+            pasta = Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData' / 'Local')) / 'BotMarcos'
         pasta.mkdir(parents=True, exist_ok=True)
         return pasta
     return Path(__file__).resolve().parent
@@ -20,5 +23,6 @@ def pasta_dados():
 
 def comando_motor():
     if getattr(sys, 'frozen', False):
-        return [str(pasta_recursos() / 'MotorMarcos.exe')]
+        nome = 'MotorMarcos.exe' if sys.platform == 'win32' else 'MotorMarcos'
+        return [str(pasta_recursos() / nome)]
     return [sys.executable, '-u', str(pasta_recursos() / 'motor_visual.py')]

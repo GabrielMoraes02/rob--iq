@@ -21,3 +21,9 @@ dist-motor/
 dist-windows/
 
 favoritos_catalogo.json
+
+build-spec-macos/
+build-motor-macos/
+build-painel-macos/
+dist-motor-macos/
+dist-macos/

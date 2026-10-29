@@ -280,3 +280,16 @@ Eventos DIAGNOSTICO_CONSULTA registram falhas e recuperacoes com etapa (envio, r
 
 ## Consulta unica em andamento (1.0.19)
 Catalogo e monitor usam consultar_opcoes: consumidores simultaneos compartilham o mesmo envio, resultado ou erro; consultas posteriores nao reutilizam cache. Prazo de resposta de 12s (antes 6s no monitor). Confirmacoes para ordens continuam limitadas a 20s. Testes cobrem concorrencia, timeout, liberacao e nova consulta. Os timeouts reais de 16:10-16:11 motivaram a alteracao; nao ha evidencia suficiente para atribuir o atraso a IQ, rede ou limitacao de frequencia. Estabilidade em sessao autenticada ainda pendente.
+
+
+## Aplicativo macOS (em validacao)
+
+O workflow `.github/workflows/macos.yml` gera variantes Intel e Apple Silicon.
+No Mac de desenvolvimento: instale Python 3.12 com Tkinter, instale
+`requirements.txt` e `requirements-build.txt` e execute `python gerar_macos.py`.
+O cliente nao precisa instalar Python. O ZIP so e criado apos o autoteste
+embutido passar (interface, motor, selecao de pares e parada, sem login).
+Os dados ficam em `~/Library/Application Support/BotMarcos`.
+O build ainda exige validacao real de login, saldo e historico em conta DEMO.
+Os artefatos nao possuem assinatura Developer ID nem notarizacao Apple;
+nao devem ser anunciados como distribuicao final validada para clientes.

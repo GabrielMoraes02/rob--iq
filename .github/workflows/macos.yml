@@ -1,0 +1,33 @@
+name: Aplicativo macOS
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '**.py'
+      - 'requirements*.txt'
+      - '.github/workflows/macos.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt -r requirements-build.txt
+      - run: python -m unittest test_caminhos_macos
+      - run: python gerar_macos.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BotMarcos-${{ matrix.runner }}
+          path: |
+            dist-macos/*.zip
+            dist-macos/autoteste.json
+          if-no-files-found: error

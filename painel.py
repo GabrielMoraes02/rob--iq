@@ -141,7 +141,7 @@ class Painel:
         self.taxa_valor = tk.StringVar(value='—')
         self.resumo_dia_texto = tk.StringVar(value='Carregando resultados do dia…')
         self.bg, self.surface, self.muted = '#17191f', '#24262e', '#9398a5'
-        root.title('Painel IQ Option | Conta demo' + (f' | Windows {VERSAO}' if getattr(sys, 'frozen', False) else ''))
+        root.title('Painel IQ Option | Conta demo' + (f' | {"macOS" if sys.platform == "darwin" else "Windows"} {VERSAO}' if getattr(sys, 'frozen', False) else ''))
         root.geometry('1280x820')
         root.minsize(1080, 720)
         root.configure(bg=self.bg)
