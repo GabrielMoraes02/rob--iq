@@ -13,6 +13,18 @@ class Recuperacao(unittest.TestCase):
         def receber(*args):iq.api.candles.candles_data=[{'from':123}]
         iq.api.getcandles.side_effect=receber
         self.assertEqual(consultar_velas_limitado(iq,'EURUSD',60,35,123),[{'from':123}])
+    def test_resposta_apos_cinco_segundos_nao_derruba_sessao(self):
+        iq=self.iq()
+        def responder(_):
+            iq.api.candles.candles_data=[{'from':123}]
+        with patch('time.monotonic',side_effect=[0,1,6]),patch('time.sleep',side_effect=responder):
+            self.assertEqual(consultar_velas_limitado(iq,'EURUSD',60,35,123),[{'from':123}])
+        iq.api.getcandles.assert_called_once()
+    def test_prazo_continua_limitado_em_quinze_segundos(self):
+        iq=self.iq()
+        with patch('time.monotonic',side_effect=[0,16]),self.assertRaises(ConnectionError):
+            consultar_velas_limitado(iq,'EURUSD',60,35,123)
+
     def test_socket_fechado_mesmo_com_flag_antiga(self):
         iq=self.iq();iq.api.websocket=SimpleNamespace(sock=SimpleNamespace(connected=False))
         with patch.object(global_value,'check_websocket_if_connect',1):

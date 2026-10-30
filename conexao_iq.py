@@ -26,7 +26,7 @@ def transporte_ativo(iq):
         return False
 
 
-def consultar_velas_limitado(iq, ativo, intervalo, quantidade, fim, timeout=5):
+def consultar_velas_limitado(iq, ativo, intervalo, quantidade, fim, timeout=15):
     import time
     from iqoptionapi.constants import ACTIVES
     if not iq.check_connect():
