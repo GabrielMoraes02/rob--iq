@@ -18,6 +18,23 @@ class Conexao(unittest.TestCase):
         instalar_compatibilidade(stable)
         return stable.IQOptionAPI()
 
+    def test_ping_encerra_sem_isalive_removido(self):
+        import threading
+        from websocket import _app
+        from conexao_iq import compatibilizar_thread_websocket
+        compatibilizar_thread_websocket()
+        self.assertFalse(hasattr(threading.Thread,'isAlive'))
+        erros=[]
+        app=_app.WebSocketApp('wss://exemplo.test',on_error=lambda *args:erros.append(type(args[-1]).__name__))
+        app.on_open=lambda *args:setattr(app,'keep_running',False)
+        dispatcher=Mock()
+        dispatcher.read.side_effect=lambda sock,read,check:read()
+        with patch.object(_app,'WebSocket') as socket:
+            app.run_forever(ping_interval=20,ping_timeout=10,dispatcher=dispatcher)
+            socket.return_value.close.assert_called()
+        self.assertEqual(erros,[])
+        self.assertIsNone(app.sock)
+
     def test_erro_nao_json_nao_mascara_causa(self):
         for motivo in ('[Errno 11001] getaddrinfo failed', '[Errno 2] No such file or directory', '', None):
             with self.subTest(motivo=motivo):

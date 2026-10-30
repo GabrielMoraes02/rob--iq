@@ -6,6 +6,18 @@ _ENVIO_LOCK = threading.RLock()
 
 
 
+
+class ThreadWebsocketLegado(threading.Thread):
+    def isAlive(self):
+        return self.is_alive()
+
+
+def compatibilizar_thread_websocket():
+    # Somente o modulo legado recebe a compatibilidade, sem alterar Thread global.
+    from types import SimpleNamespace
+    from websocket import _app
+    _app.threading = SimpleNamespace(Thread=ThreadWebsocketLegado, Event=threading.Event)
+
 def enviar_com_trava_segura(api, name, msg, request_id='', no_force_send=True):
     import time
     from iqoptionapi import global_value
@@ -78,6 +90,7 @@ def instalar_compatibilidade(stable_api):
     import time
     from iqoptionapi.api import WebsocketClient
     from iqoptionapi import global_value
+    compatibilizar_thread_websocket()
     original = stable_api.IQOptionAPI
 
     class APICompativel(original):
