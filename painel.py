@@ -20,6 +20,7 @@ from processos import encerrar_motor
 
 BASE = pasta_dados()
 EXPLICACOES = {
+    'EXPIRACAO_INDISPONIVEL': 'A expiração escolhida não corresponde à modalidade confirmada deste par. Nenhuma ordem enviada; veja os detalhes.',
     'DEMO_ENVIADA': 'Ordem automática enviada na conta DEMO (saldo virtual). Veja direção e ID nos detalhes.',
     'ORDEM_RECUSADA': 'A corretora recusou a ordem. Veja os detalhes.',
     'ERRO_ORDEM': 'Falha ao enviar a ordem. Confira a plataforma antes de concluir se houve entrada.',

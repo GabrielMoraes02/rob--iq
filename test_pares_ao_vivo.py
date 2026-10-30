@@ -88,8 +88,9 @@ class ParesVivos(unittest.TestCase):
         with patch('expiracao_ordem.time.time', return_value=1800000005), \
              patch('iqoptionapi.expiration.get_expiration_time', return_value=(1800000060, 0)), \
              patch('expiracao_ordem.comprar_por_vencimento_api', return_value=(False, 'teste')) as envio:
-            self.assertEqual(comprar_binaria_categoria(iq, 20, 'GBPCHF', 'call', 1, 'binary', turbo), (False, 'teste'))
-            envio.assert_called_once_with(iq, 20, 'GBPCHF', 'call', 'binary', 1800000060)
+            with self.assertRaisesRegex(ValueError, 'corresponde a Turbo'):
+                comprar_binaria_categoria(iq, 20, 'GBPCHF', 'call', 1, 'binary', turbo)
+            envio.assert_not_called()
             turbo.assert_not_called()
             with self.assertRaises(ValueError): comprar_binaria_categoria(iq, 20, 'GBPCHF', 'call', 1, 'blitz', turbo)
             with self.assertRaises(ValueError): comprar_binaria_categoria(iq, 20, 'GBPCHF', 'call', 0.5, 'binary', turbo)

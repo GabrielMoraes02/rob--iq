@@ -62,6 +62,18 @@ class Expiracao(unittest.TestCase):
         comprar_com_expiracao(iq, 20, 'EURUSD', 'call', 3)
         iq.buy.assert_called_once_with(20, 'EURUSD', 'call', 3)
 
+    def test_turbo_preserva_envio_e_binary_bloqueia_vencimento_curto(self):
+        from expiracao_ordem import comprar_binaria_categoria, VencimentoIncompativel
+        iq=self.corretora()
+        enviar=Mock(return_value=(True,123))
+        self.assertEqual(comprar_binaria_categoria(iq,20,'USDJPY-OTC','put',1,'turbo',enviar),(True,123))
+        enviar.assert_called_once_with(20,'USDJPY-OTC','put',1)
+        with patch('expiracao_ordem.time.time',return_value=1800000009), patch('expiracao_ordem.comprar_por_vencimento_api') as raw:
+            for prazo in range(1,6):
+                with self.subTest(prazo=prazo), self.assertRaises(VencimentoIncompativel):
+                    comprar_binaria_categoria(iq,20,'USDJPY-OTC','put',prazo,'binary',enviar)
+            raw.assert_not_called()
+
     def test_interface_mostra_30_segundos_no_destaque(self):
         from painel import Painel
         root = tk.Tk()

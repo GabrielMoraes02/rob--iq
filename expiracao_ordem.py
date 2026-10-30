@@ -4,6 +4,10 @@ import time
 import uuid
 
 
+class VencimentoIncompativel(ValueError):
+    pass
+
+
 def comprar_binaria_categoria(iq, valor, ativo, direcao, minutos, categoria, comprar_turbo):
     if not iq.check_connect() or iq.get_balance_mode() != 'PRACTICE':
         raise RuntimeError('Conta PRACTICE conectada não confirmada.')
@@ -15,7 +19,14 @@ def comprar_binaria_categoria(iq, valor, ativo, direcao, minutos, categoria, com
     agora = iq.get_server_timestamp()
     if isinstance(agora, bool) or not isinstance(agora, (int, float)) or not math.isfinite(agora) or abs(time.time()-agora) > 3:
         raise RuntimeError('Relógio da corretora desatualizado; ordem bloqueada.')
-    vencimento, _ = get_expiration_time(agora, minutos)
+    vencimento, indice = get_expiration_time(agora, minutos)
+    # A biblioteca classifica os cinco vencimentos curtos como Turbo (tipo 3).
+    # Nao enviar esse timestamp como Binary (tipo 1): produto/vencimento divergem.
+    if indice < 5:
+        raise VencimentoIncompativel(
+            f'{ativo}: expiração de {minutos} minuto(s) corresponde a Turbo, '
+            'mas o instrumento foi confirmado apenas como Binary. '
+            'Vencimento indisponível nesta modalidade; nenhuma ordem enviada.')
     return comprar_por_vencimento_api(iq, valor, ativo, direcao, categoria, vencimento)
 
 

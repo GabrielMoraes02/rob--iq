@@ -10,7 +10,7 @@ import time
 from datetime import datetime
 from getpass import getpass
 from configuracao import formatar_expiracao
-from expiracao_ordem import comprar_com_expiracao
+from expiracao_ordem import comprar_com_expiracao, VencimentoIncompativel
 
 ATIVOS = ['EURUSD-OTC', 'GBPUSD-OTC', 'USDJPY-OTC', 'EURJPY-OTC', 'GBPJPY-OTC']
 VELA_SEGUNDOS = 60
@@ -394,6 +394,8 @@ def processar(ativo, velas, estado, agora, enviar_ordem, iq, disponibilidade_con
                         ORDENS_PENDENTES[str(id_ordem)] = (ativo, a['lado'])
                     threading.Thread(target=aguardar_resultado,
                         args=(iq, ativo, a['lado'], id_ordem), daemon=True).start()
+        except VencimentoIncompativel as exc:
+            escrever(ativo, 'EXPIRACAO_INDISPONIVEL', str(exc))
         except Exception as exc:
             escrever(ativo, 'ERRO_ORDEM', repr(exc))
     estado['alerta'] = None
