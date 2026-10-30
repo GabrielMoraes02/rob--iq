@@ -336,9 +336,9 @@ def processar(ativo, velas, estado, agora, enviar_ordem, iq, disponibilidade_con
             escrever(ativo, 'BOLINHA_CALCULADA',
                      f'candle={atual["t"]} lado={bolinha_atual or percurso[0]} origem={"preco_atual" if bolinha_atual else "percurso_da_vela"} segundo={segundo:.1f}')
         a['bolinha_vista'] = True
-    if a.get('bolinha_vista') and (seta_atual or a['seta']):
+    if a.get('bolinha_vista'):
         estado['alerta'] = None
-        escrever(ativo, 'DESCARTADO', f'bolinha_e_seta_na_mesma_vela candle={atual["t"]} intrabar=1')
+        escrever(ativo, 'DESCARTADO', f'vela_bloqueada_por_bolinha candle={atual["t"]} intrabar=1; qualquer seta nesta vela sera ignorada')
         return
     if a['lado'] is None:
         if seta_atual is None:

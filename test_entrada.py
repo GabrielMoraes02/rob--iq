@@ -152,6 +152,19 @@ class Entrada(unittest.TestCase):
         prev2['c']=0.99
         self.assertEqual(bot.bolinhas_no_percurso(v,prev,prev2),[])
 
+    def test_so_bolinha_bloqueia_imediatamente_mas_proxima_vela_so_seta_envia(self):
+        t,v,estado,iq=self.cenario_intrabar('CALL')
+        with patch.object(bot,'bolinha',return_value='CALL'), patch.object(bot,'seta',return_value=None):
+            log=self.ciclo(t,v,estado,iq,2)
+        self.assertIsNone(estado['alerta'])
+        self.assertTrue(any('vela_bloqueada_por_bolinha' in str(c) for c in log.call_args_list))
+        with patch.object(bot,'bolinha',return_value=None),patch.object(bot,'bolinhas_no_percurso',return_value=[]),patch.object(bot,'seta',return_value='CALL'),patch.object(bot,'SEM_RECUO',True):
+            self.ciclo(t,v,estado,iq,5)
+            self.assertEqual(iq.chamadas,[])
+            v.append({'t':t+60,'o':1.1,'c':1.1,'h':1.1,'l':1.1})
+            self.ciclo(t,v,estado,iq,61)
+            self.assertEqual(len(iq.chamadas),1)
+
     def test_call_toque_antigo_nao_envia(self):
         chamadas, estado = self.executar('CALL', 1.1002)
         self.assertEqual(chamadas, [])
