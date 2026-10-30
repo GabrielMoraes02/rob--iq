@@ -2,6 +2,21 @@
 import json
 
 
+
+def enviar_com_trava_segura(api, name, msg, request_id='', no_force_send=True):
+    import time
+    from iqoptionapi import global_value
+    limite = time.monotonic() + 5
+    while no_force_send and (global_value.ssl_Mutual_exclusion or global_value.ssl_Mutual_exclusion_write):
+        if time.monotonic() >= limite:
+            raise TimeoutError('Canal de envio ocupado; consulta nao enviada')
+        time.sleep(0.01)
+    global_value.ssl_Mutual_exclusion_write = True
+    try:
+        api.websocket.send(json.dumps(dict(name=name, msg=msg, request_id=request_id)))
+    finally:
+        global_value.ssl_Mutual_exclusion_write = False
+
 def motivo_seguro(motivo):
     texto = str(motivo)
     if '11001' in texto or 'getaddrinfo' in texto:
@@ -29,6 +44,9 @@ def instalar_compatibilidade(stable_api):
     original = stable_api.IQOptionAPI
 
     class APICompativel(original):
+        def send_websocket_request(self, name, msg, request_id='', no_force_send=True):
+            return enviar_com_trava_segura(self, name, msg, request_id, no_force_send)
+
         def start_websocket(self):
             global_value.check_websocket_if_connect = None
             global_value.check_websocket_if_error = False

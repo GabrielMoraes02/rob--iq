@@ -125,7 +125,12 @@ def instalar_consulta(api):
     def receber(_websocket, *args):
         if args and consulta.receber(args[-1]):
             return
-        return original(*args)
+        try:
+            return original(*args)
+        finally:
+            # O SDK deixa a trava de leitura presa se um handler falhar.
+            from iqoptionapi import global_value
+            global_value.ssl_Mutual_exclusion = False
     # websocket-client 0.56 injeta o socket em funções, mas não em métodos.
     # Preserve o método ligado para não repassar um argumento extra ao SDK.
     api.websocket.on_message = MethodType(receber, api.websocket)
