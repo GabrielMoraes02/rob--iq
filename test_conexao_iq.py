@@ -36,6 +36,8 @@ class Conexao(unittest.TestCase):
             def abrir(): global_value.check_websocket_if_connect = 1
             thread.return_value.start.side_effect = abrir
             self.assertEqual(self.api((True,None)).start_websocket(), (True,None))
+            self.assertEqual(thread.call_args.kwargs['kwargs']['ping_interval'],20)
+            self.assertEqual(thread.call_args.kwargs['kwargs']['ping_timeout'],10)
             opcoes = thread.call_args.kwargs['kwargs']['sslopt']
             self.assertEqual(opcoes['cert_reqs'], ssl.CERT_REQUIRED)
             self.assertTrue(opcoes['check_hostname'])

@@ -1,5 +1,8 @@
 """Compatibilidade e diagnóstico de transporte sem expor credenciais."""
 import json
+import threading
+
+_ENVIO_LOCK = threading.RLock()
 
 
 
@@ -7,15 +10,20 @@ def enviar_com_trava_segura(api, name, msg, request_id='', no_force_send=True):
     import time
     from iqoptionapi import global_value
     limite = time.monotonic() + 5
-    while no_force_send and (global_value.ssl_Mutual_exclusion or global_value.ssl_Mutual_exclusion_write):
-        if time.monotonic() >= limite:
-            raise TimeoutError('Canal de envio ocupado; consulta nao enviada')
-        time.sleep(0.01)
-    global_value.ssl_Mutual_exclusion_write = True
+    if not _ENVIO_LOCK.acquire(timeout=5):
+        raise TimeoutError('Canal de envio ocupado; mensagem nao enviada')
     try:
-        api.websocket.send(json.dumps(dict(name=name, msg=msg, request_id=request_id)))
+        while no_force_send and global_value.ssl_Mutual_exclusion:
+            if time.monotonic() >= limite:
+                raise TimeoutError('Canal de leitura ocupado; mensagem nao enviada')
+            time.sleep(0.01)
+        global_value.ssl_Mutual_exclusion_write = True
+        try:
+            api.websocket.send(json.dumps(dict(name=name, msg=msg, request_id=request_id)))
+        finally:
+            global_value.ssl_Mutual_exclusion_write = False
     finally:
-        global_value.ssl_Mutual_exclusion_write = False
+        _ENVIO_LOCK.release()
 
 
 def transporte_ativo(iq):
@@ -86,7 +94,7 @@ def instalar_compatibilidade(stable_api):
             # A biblioteca usa 'cacert.pem' relativo; no EXE os certificados
             # ficam dentro do pacote. Usar caminho absoluto e verificar TLS.
             self.websocket_thread = threading.Thread(target=self.websocket.run_forever,
-                kwargs={'sslopt': {'check_hostname': True, 'cert_reqs': ssl.CERT_REQUIRED,
+                kwargs={'ping_interval': 20, 'ping_timeout': 10, 'sslopt': {'check_hostname': True, 'cert_reqs': ssl.CERT_REQUIRED,
                                   'ca_certs': certifi.where()}}, daemon=True)
             self.websocket_thread.start()
             limite = time.monotonic() + 20

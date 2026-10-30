@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-VERSAO = '1.0.26'
+VERSAO = '1.0.27'
 
 
 def pasta_recursos():

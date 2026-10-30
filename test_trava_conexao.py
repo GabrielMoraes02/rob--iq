@@ -22,3 +22,25 @@ class TravaConexao(unittest.TestCase):
         with patch('time.monotonic',side_effect=[0,6]),self.assertRaises(TimeoutError):
             enviar_com_trava_segura(api,'consulta',{})
         api.websocket.send.assert_not_called()
+
+    def test_envios_concorrentes_nao_se_sobrepoem(self):
+        import threading,time
+        from concurrent.futures import ThreadPoolExecutor
+        controle=threading.Lock()
+        ativos=0
+        maior=0
+        total=0
+        def enviar(_):
+            nonlocal ativos,maior,total
+            with controle:
+                ativos+=1
+                maior=max(maior,ativos)
+            time.sleep(0.002)
+            with controle:
+                ativos-=1
+                total+=1
+        api=SimpleNamespace(websocket=SimpleNamespace(send=enviar))
+        with ThreadPoolExecutor(max_workers=12) as executor:
+            list(executor.map(lambda i:enviar_com_trava_segura(api,'consulta',{'i':i}),range(40)))
+        self.assertEqual(maior,1)
+        self.assertEqual(total,40)
