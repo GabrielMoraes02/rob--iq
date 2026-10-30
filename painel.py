@@ -936,17 +936,14 @@ class Painel:
             valor = f"{dados['valor']:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')
             consultado = float(dados.get('consultado_em', time.time()))
             if time.time() - consultado > 10:
-                self.saldo_valor.set('—')
-                self.saldo_texto.set('Resposta de saldo atrasada · aguardando consulta atual.')
+                self.saldo_texto.set('Saldo desatualizado · resposta atrasada; aguardando consulta atual.')
                 return
             self.ultimo_saldo_recebido = time.monotonic()
             self.saldo_valor.set(valor)
             hora = datetime.fromtimestamp(consultado).strftime('%H:%M:%S')
             self.saldo_texto.set(f"DEMO · {dados.get('moeda', 'moeda não informada')} · conta {dados.get('conta', 'não informada')} · consultado às {hora} · atualização a cada 3s + API")
         elif tipo == 'saldo_erro':
-            self.saldo_valor.set('—')
-            self.ultimo_saldo_recebido = None
-            self.saldo_texto.set('Consulta de saldo falhou (' + dados.get('motivo', 'sem resposta') + ') · confira a conta demo no site.')
+            self.saldo_texto.set('Saldo desatualizado · consulta falhou (' + dados.get('motivo', 'sem resposta') + ') · valor exibido é o último confirmado; confira na IQ Option.')
         elif tipo == 'resultado' and dados['id'] not in self.ids_resultados:
             self.ids_resultados.add(dados['id'])
             self.atualizar_resumo_diario()
@@ -971,8 +968,7 @@ class Painel:
     def sincronizar_resumo_diario(self):
         self.atualizar_resumo_diario()
         if self.ultimo_saldo_recebido is not None and time.monotonic() - self.ultimo_saldo_recebido > 10:
-            self.saldo_valor.set('—')
-            self.saldo_texto.set('Saldo sem atualização há mais de 10s · aguardando resposta da corretora.')
+            self.saldo_texto.set('Saldo desatualizado há mais de 10s · valor exibido é o último confirmado; aguardando a corretora.')
         self.root.after(3000, self.sincronizar_resumo_diario)
 
     def selecionar(self, event=None):

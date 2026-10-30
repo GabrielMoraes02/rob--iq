@@ -141,6 +141,10 @@ def acompanhar_saldo(iq, parar, atualizar):
 
 ClasseOriginal = stable_api.IQ_Option
 class ContaPainel(ClasseOriginal):
+    def check_win_v4(self, id_number):
+        from resultado_corretora import aguardar
+        return aguardar(self, id_number)
+
     def saldo_para_entrada(self):
         return consultar_saldo_demo(self, stable_api.global_value.balance_id)
 
