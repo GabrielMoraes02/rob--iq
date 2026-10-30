@@ -17,6 +17,35 @@ def enviar_com_trava_segura(api, name, msg, request_id='', no_force_send=True):
     finally:
         global_value.ssl_Mutual_exclusion_write = False
 
+
+def transporte_ativo(iq):
+    try:
+        from iqoptionapi import global_value
+        return global_value.check_websocket_if_connect in (1, True) and bool(iq.api.websocket.sock.connected)
+    except (AttributeError, TypeError):
+        return False
+
+
+def consultar_velas_limitado(iq, ativo, intervalo, quantidade, fim, timeout=5):
+    import time
+    from iqoptionapi.constants import ACTIVES
+    if not iq.check_connect():
+        raise ConnectionError('Canal de velas desconectado')
+    api = iq.api
+    api.candles.candles_data = None
+    try:
+        api.getcandles(ACTIVES[ativo], intervalo, quantidade, fim)
+    except Exception as erro:
+        raise ConnectionError('Falha no envio da consulta de velas') from erro
+    prazo = time.monotonic() + timeout
+    while time.monotonic() < prazo:
+        if not iq.check_connect() or iq.api is not api:
+            raise ConnectionError('Canal de velas encerrou durante a consulta')
+        if api.candles.candles_data is not None:
+            return api.candles.candles_data
+        time.sleep(0.05)
+    raise ConnectionError('Sem resposta de velas no prazo; reconexao necessaria')
+
 def motivo_seguro(motivo):
     texto = str(motivo)
     if '11001' in texto or 'getaddrinfo' in texto:

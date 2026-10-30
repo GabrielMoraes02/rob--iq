@@ -141,6 +141,20 @@ def acompanhar_saldo(iq, parar, atualizar):
 
 ClasseOriginal = stable_api.IQ_Option
 class ContaPainel(ClasseOriginal):
+    def check_connect(self):
+        from conexao_iq import transporte_ativo
+        return transporte_ativo(self)
+
+    def get_candles(self, ativo, intervalo, quantidade, fim):
+        from conexao_iq import consultar_velas_limitado
+        return consultar_velas_limitado(self, ativo, intervalo, quantidade, fim)
+
+    def encerrar_transporte(self):
+        if saldo_stop is not None:
+            saldo_stop.set()
+            saldo_agora.set()
+        self.api.close()
+
     def check_win_v4(self, id_number):
         from resultado_corretora import aguardar
         return aguardar(self, id_number)

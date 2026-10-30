@@ -538,11 +538,17 @@ def main():
                 except Exception as exc:
                     falhas_consecutivas += 1
                     escrever(ativo,'ERRO_LEITURA',repr(exc))
-                    if falhas_consecutivas >= MAX_FALHAS_LEITURA or not iq.check_connect():
+                    if isinstance(exc, ConnectionError) or falhas_consecutivas >= MAX_FALHAS_LEITURA or not iq.check_connect():
                         raise ConnectionError('Falhas de leitura repetidas / WebSocket fechado') from exc
             time.sleep(INTERVALO)
         except (ConnectionError, OSError, AttributeError) as exc:
-            escrever('GERAL', 'RECONEXAO_NECESSARIA', repr(exc))
+            escrever('GERAL', 'RECONEXAO_NECESSARIA', type(exc).__name__)
+            encerrar = getattr(iq, 'encerrar_transporte', None)
+            if callable(encerrar):
+                try:
+                    encerrar()
+                except Exception:
+                    pass
             # Descartar alertas antigos: evita ordem baseada em dados obsoletos.
             for ativo in ATIVOS:
                 estados[ativo]['alerta'] = None
