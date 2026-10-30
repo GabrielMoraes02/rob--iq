@@ -259,6 +259,21 @@ def bolinha(v, prev, prev2):
     return 'CALL' if call else 'PUT' if put else None
 
 
+
+def bolinhas_no_percurso(v, prev, prev2):
+    """Reconstrucao conservadora: extremos JA recebidos, nunca velas futuras.
+
+    Os outros termos da formula sao fixos durante a vela. Se a maxima/minima
+    cruzou o limiar, a condicao ocorreu mesmo que o ultimo close tenha voltado.
+    Nao presume a ordem entre maxima e minima nem confirma seta historica.
+    """
+    lados = []
+    if prev['c'] < prev['o'] and v['h'] > v['o'] and v['h'] > prev['h'] and prev2['c'] >= v['o']:
+        lados.append('CALL')
+    if prev['c'] > prev['o'] and v['l'] < v['o'] and v['l'] < prev['l'] and prev2['c'] <= v['o']:
+        lados.append('PUT')
+    return lados
+
 def seta(v, prev, prev2, prev3):
     call = v['c'] > prev['c'] and prev['c'] > prev2['o'] and prev3['c'] > prev2['c']
     put = v['c'] < prev['c'] and prev['c'] < prev2['o'] and prev3['c'] < prev2['c']
@@ -315,7 +330,11 @@ def processar(ativo, velas, estado, agora, enviar_ordem, iq, disponibilidade_con
         return
     seta_atual = seta(atual, fechadas[-1], fechadas[-2], fechadas[-3])
     bolinha_atual = bolinha(atual, fechadas[-1], fechadas[-2])
-    if bolinha_atual:
+    percurso = bolinhas_no_percurso(atual, fechadas[-1], fechadas[-2])
+    if bolinha_atual or percurso:
+        if not a.get('bolinha_vista'):
+            escrever(ativo, 'BOLINHA_CALCULADA',
+                     f'candle={atual["t"]} lado={bolinha_atual or percurso[0]} origem={"preco_atual" if bolinha_atual else "percurso_da_vela"} segundo={segundo:.1f}')
         a['bolinha_vista'] = True
     if a.get('bolinha_vista') and (seta_atual or a['seta']):
         estado['alerta'] = None

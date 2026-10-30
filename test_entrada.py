@@ -121,6 +121,37 @@ class Entrada(unittest.TestCase):
         self.assertEqual(iq.chamadas,[])
         self.assertIsNone(estado['alerta'])
 
+    def test_bolinha_perdida_entre_consultas_descarta_seta(self):
+        for lado in ('CALL','PUT'):
+            with self.subTest(lado=lado), patch.object(bot,'SEM_RECUO',True):
+                t,v,estado,iq=self.cenario_intrabar(lado)
+                # Cria bolinha oposta a seta que existiu no extremo da vela,
+                # mas ja desapareceu no ultimo preco lido.
+                if lado=='CALL':
+                    v[-1]['l']=v[-2]['l']-0.001
+                    v[-3]['c']=v[-1]['o']-0.0001
+                else:
+                    v[-1]['h']=v[-2]['h']+0.001
+                    v[-3]['c']=v[-1]['o']+0.0001
+                with patch.object(bot,'seta',return_value=lado):
+                    self.assertIsNone(bot.bolinha(v[-1],v[-2],v[-3]))
+                    log=self.ciclo(t,v,estado,iq,6)
+                self.assertEqual(iq.chamadas,[])
+                self.assertIsNone(estado['alerta'])
+                self.assertTrue(any('percurso_da_vela' in str(c) for c in log.call_args_list))
+                self.ciclo(t,v,estado,iq,7)
+                self.assertEqual(iq.chamadas,[])
+
+    def test_percurso_preserva_comparacoes_estritas_do_indicador(self):
+        v={'o':1.,'c':1.,'h':1.2,'l':0.8}
+        prev={'o':1.,'c':0.9,'h':1.2,'l':0.8}
+        prev2={'c':1.}
+        self.assertEqual(bot.bolinhas_no_percurso(v,prev,prev2),[])
+        v['h']=1.2001
+        self.assertEqual(bot.bolinhas_no_percurso(v,prev,prev2),['CALL'])
+        prev2['c']=0.99
+        self.assertEqual(bot.bolinhas_no_percurso(v,prev,prev2),[])
+
     def test_call_toque_antigo_nao_envia(self):
         chamadas, estado = self.executar('CALL', 1.1002)
         self.assertEqual(chamadas, [])
